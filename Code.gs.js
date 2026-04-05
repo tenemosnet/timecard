@@ -33,6 +33,8 @@ function onOpen() {
     .addItem('初期設定（初回のみ）', 'initialize')
     .addSeparator()
     .addItem('新しい月へ移行', 'promptNewMonth')
+    .addItem('PDF出力（月次）', 'exportPdf')
+    .addSeparator()
     .addItem('曜日の数式を修復', 'fixWeekdayFormulas')
     .addItem('スタッフ名を変更', 'showStaffHelp')
     .addToUi();
@@ -359,6 +361,103 @@ function promptNewMonth() {
   });
 
   ui.alert('完了', '全スタッフのシートを ' + year + '年' + month + '月に更新しました。', ui.ButtonSet.OK);
+}
+
+// =====================================================================
+//  PDF出力（月次）
+// =====================================================================
+function exportPdf() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  // スタッフシート一覧を取得
+  const staffSheets = ss.getSheets().filter(s => s.getName() !== LOG_SHEET_NAME);
+  if (staffSheets.length === 0) {
+    ui.alert('エラー', 'スタッフシートが見つかりません。先に初期設定を実行してください。', ui.ButtonSet.OK);
+    return;
+  }
+
+  // 最初のスタッフシートから年月を取得
+  const year = staffSheets[0].getRange('D1').getValue();
+  const month = staffSheets[0].getRange('F1').getValue();
+  const staffNames = staffSheets.map(s => s.getName()).join('、');
+
+  const confirm = ui.alert(
+    'PDF出力',
+    year + '年' + month + '月の勤務表をPDFで出力します。\n\n' +
+    '対象スタッフ: ' + staffNames + '\n\n' +
+    'Googleドライブに保存されます。続行しますか？',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (confirm !== ui.Button.OK) return;
+
+  // 出力先フォルダを作成（タイムカードPDF / YYYY年MM月）
+  const rootFolderName = 'タイムカードPDF';
+  const monthFolderName = year + '年' + String(month).padStart(2, '0') + '月';
+
+  let rootFolder;
+  const rootFolders = DriveApp.getFoldersByName(rootFolderName);
+  if (rootFolders.hasNext()) {
+    rootFolder = rootFolders.next();
+  } else {
+    rootFolder = DriveApp.createFolder(rootFolderName);
+  }
+
+  let monthFolder;
+  const monthFolders = rootFolder.getFoldersByName(monthFolderName);
+  if (monthFolders.hasNext()) {
+    monthFolder = monthFolders.next();
+  } else {
+    monthFolder = rootFolder.createFolder(monthFolderName);
+  }
+
+  // 各スタッフシートをPDF出力
+  const ssId = ss.getId();
+  const token = ScriptApp.getOAuthToken();
+  const createdFiles = [];
+
+  staffSheets.forEach(sheet => {
+    const sheetName = sheet.getName();
+    const fileName = sheetName + '_' + year + '年' + String(month).padStart(2, '0') + '月_勤務表.pdf';
+
+    // 同名ファイルが既にあれば削除（上書き相当）
+    const existing = monthFolder.getFilesByName(fileName);
+    while (existing.hasNext()) {
+      existing.next().setTrashed(true);
+    }
+
+    // PDF生成URL
+    const url = 'https://docs.google.com/spreadsheets/d/' + ssId + '/export?' +
+      'format=pdf' +
+      '&gid=' + sheet.getSheetId() +
+      '&size=A4' +
+      '&landscape=true' +
+      '&fitw=true' +
+      '&gridlines=false' +
+      '&printtitle=false' +
+      '&sheetnames=false' +
+      '&pagenum=UNDEFINED' +
+      '&fzr=true' +
+      '&range=A1:H41';
+
+    const response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    const blob = response.getBlob().setName(fileName);
+    const file = monthFolder.createFile(blob);
+    createdFiles.push(sheetName);
+  });
+
+  ui.alert(
+    'PDF出力完了',
+    createdFiles.length + '名分のPDFを出力しました。\n\n' +
+    '保存先: Googleドライブ\n' +
+    '  📁 ' + rootFolderName + ' / ' + monthFolderName + '\n\n' +
+    '出力ファイル:\n' +
+    createdFiles.map(name => '  ・' + name).join('\n'),
+    ui.ButtonSet.OK
+  );
 }
 
 // =====================================================================
