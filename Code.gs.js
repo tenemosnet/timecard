@@ -18,7 +18,8 @@
 // =====================================================================
 //  設定（ここを書き換えてカスタマイズ）
 // =====================================================================
-const STAFF_NAMES = ['山田 太郎', '佐藤 花子', '田中 一郎'];
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // ← スプレッドシートのURLから取得して貼り付け
+const STAFF_NAMES = ['山田 太郎', '佐藤 花子', '田中 一郎']; // ※ 初期設定時のみ使用。以降はシート名で管理
 const LOG_SHEET_NAME = '打刻ログ';
 const OVERTIME_THRESHOLD = 8;       // 残業基準（時間）
 const LUNCH_DEDUCT_6H = 0.75;      // 6時間以上勤務: 45分控除
@@ -237,7 +238,7 @@ function createStaffSheet_(ss, staffName, year, month) {
 //  打刻処理（HTML画面から呼ばれる）
 // =====================================================================
 function recordClock(staffName, type) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
   if (!logSheet) throw new Error('打刻ログシートが見つかりません。初期設定を実行してください。');
 
@@ -275,7 +276,7 @@ function recordClock(staffName, type) {
 //  スタッフ一覧＋本日のステータス取得（HTML画面から呼ばれる）
 // =====================================================================
 function getStaffWithStatus() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
   const today = new Date();
   today.setHours(0, 0, 0, 0);

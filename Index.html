@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>タイムカード</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -239,6 +241,7 @@
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
   }
 
@@ -383,7 +386,7 @@
   </div>
   <div class="header-status">
     <div class="status-dot" id="connectionDot"></div>
-    <span id="connectionText">接続中…</span>
+    <span id="connectionText">接続中&hellip;</span>
   </div>
 </div>
 
@@ -397,7 +400,7 @@
 <div id="staffArea">
   <div class="loading">
     <div class="spinner"></div>
-    スタッフ情報を取得中…
+    スタッフ情報を取得中&hellip;
   </div>
 </div>
 
@@ -472,7 +475,7 @@
 
     staffData.forEach(function(s, i) {
       var statusText = s.status === 'working' ? '勤務中' : s.status === 'done' ? '退勤済' : '未出勤';
-      var actionText = s.status === 'none' ? '入室打刻 →' : s.status === 'working' ? '← 退室打刻' : '';
+      var actionText = s.status === 'none' ? '入室打刻 &rarr;' : s.status === 'working' ? '&larr; 退室打刻' : '';
       var cardClass = 'staff-card ' + s.status + (isProcessing ? ' disabled' : '');
 
       var timeHtml = '';
