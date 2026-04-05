@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #070e1a;
+    --bg-card: #111f36;
+    --bg-card-hover: #162847;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8edf5;
+    --text-sub: #8899b2;
+    --text-muted: #556882;
+    --accent: #3b82f6;
+    --green: #34d399;
+    --green-bg: rgba(52,211,153,0.08);
+    --green-border: rgba(52,211,153,0.25);
+    --amber: #fbbf24;
+    --amber-bg: rgba(251,191,36,0.08);
+    --amber-border: rgba(251,191,36,0.2);
+    --red: #f87171;
+    --radius: 16px;
+  }
+
+  body {
+    font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* ヘッダー */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 28px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 900; color: #fff;
+    box-shadow: 0 4px 20px rgba(59,130,246,0.3);
+  }
+
+  .logo-text {
+    font-size: 18px; font-weight: 700;
+    color: var(--text-sub);
+    letter-spacing: 2px;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.offline { background: var(--red); animation: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* 時計 */
+  .clock-area {
+    text-align: center;
+    padding: 36px 0 28px;
+  }
+
+  .big-time {
+    font-size: 72px;
+    font-weight: 200;
+    letter-spacing: 4px;
+    color: #f0f4ff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 40px rgba(96,165,250,0.1);
+    line-height: 1;
+  }
+
+  .date-text {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    letter-spacing: 2px;
+  }
+
+  /* スタッフグリッド */
+  .staff-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    padding: 0 28px 32px;
+  }
+
+  .staff-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .staff-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: transparent;
+    transition: background 0.3s;
+  }
+
+  .staff-card:active {
+    transform: scale(0.98);
+  }
+
+  .staff-card.working {
+    border-color: var(--green-border);
+    background: var(--green-bg);
+  }
+  .staff-card.working::before {
+    background: linear-gradient(90deg, #10b981, #34d399);
+  }
+
+  .staff-card.done {
+    border-color: var(--amber-border);
+    background: var(--amber-bg);
+    cursor: default;
+    opacity: 0.7;
+  }
+  .staff-card.done::before {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  }
+
+  .staff-card.disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  .staff-name {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .badge.none { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+  .badge.working { background: rgba(52,211,153,0.15); color: var(--green); }
+  .badge.done { background: rgba(251,191,36,0.12); color: var(--amber); }
+
+  .badge-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .badge.working .badge-dot { animation: pulse 2s infinite; }
+
+  .action-hint {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    opacity: 0.6;
+  }
+
+  .time-info {
+    font-size: 14px;
+    color: var(--text-sub);
+    margin-top: 14px;
+    display: flex;
+    gap: 20px;
+  }
+
+  .time-info span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .time-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  /* モーダル */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.65);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(6px);
+  }
+
+  .modal-overlay.show { display: flex; }
+
+  .modal-box {
+    background: #1a2744;
+    border-radius: 24px;
+    padding: 40px 44px;
+    min-width: 380px;
+    max-width: 460px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: center;
+    animation: slideUp 0.25s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .modal-title {
+    font-size: 24px;
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+
+  .modal-time {
+    font-size: 48px;
+    font-weight: 200;
+    color: var(--text);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .modal-sub {
+    font-size: 16px;
+    color: var(--text-sub);
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  .modal-btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .btn {
+    padding: 14px 36px;
+    border-radius: 14px;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn:active { transform: scale(0.96); }
+
+  .btn-cancel {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    color: var(--text-sub);
+  }
+
+  .btn-in {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(16,185,129,0.3);
+  }
+
+  .btn-out {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+  }
+
+  /* トースト */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 16px 32px;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    z-index: 2000;
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 2.5s forwards;
+  }
+
+  .toast.success {
+    background: #0f2922;
+    border: 1px solid var(--green-border);
+    color: var(--green);
+  }
+
+  .toast.error {
+    background: #2a1215;
+    border: 1px solid rgba(248,113,113,0.3);
+    color: var(--red);
+  }
+
+  @keyframes toastIn { from { transform: translateX(-50%) translateY(20px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+  @keyframes toastOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
+
+  /* ローディング */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 0;
+    font-size: 16px;
+    color: var(--text-muted);
+  }
+
+  .spinner {
+    width: 24px; height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 12px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">TC</div>
+    <div class="logo-text">タイムカード</div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot" id="connectionDot"></div>
+    <span id="connectionText">接続中…</span>
+  </div>
+</div>
+
+<!-- 時計 -->
+<div class="clock-area">
+  <div class="big-time" id="clockTime">--:--</div>
+  <div class="date-text" id="clockDate">----年--月--日</div>
+</div>
+
+<!-- スタッフ一覧 -->
+<div id="staffArea">
+  <div class="loading">
+    <div class="spinner"></div>
+    スタッフ情報を取得中…
+  </div>
+</div>
+
+<!-- 確認モーダル -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-time" id="modalTime"></div>
+    <div class="modal-sub" id="modalSub"></div>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn" id="modalConfirm" onclick="confirmClock()"></button>
+    </div>
+  </div>
+</div>
+
+<!-- トーストコンテナ -->
+<div id="toasts"></div>
+
+<script>
+  // ===== 状態 =====
+  var staffData = [];
+  var pendingAction = null;
+  var isProcessing = false;
+  var DAY_NAMES = ['日','月','火','水','木','金','土'];
+
+  // ===== 時計 =====
+  function updateClock() {
+    var now = new Date();
+    var h = String(now.getHours()).padStart(2, '0');
+    var m = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('clockTime').textContent = h + ':' + m;
+    document.getElementById('clockDate').textContent =
+      now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日（' + DAY_NAMES[now.getDay()] + '）';
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ===== スタッフ一覧取得 =====
+  function loadStaff() {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        staffData = data;
+        renderStaff();
+        setConnection(true);
+      })
+      .withFailureHandler(function(err) {
+        setConnection(false);
+        showToast('データ取得に失敗しました: ' + err.message, 'error');
+        // 10秒後にリトライ
+        setTimeout(loadStaff, 10000);
+      })
+      .getStaffWithStatus();
+  }
+
+  function setConnection(ok) {
+    var dot = document.getElementById('connectionDot');
+    var text = document.getElementById('connectionText');
+    if (ok) {
+      dot.className = 'status-dot';
+      text.textContent = 'オンライン';
+    } else {
+      dot.className = 'status-dot offline';
+      text.textContent = 'オフライン';
+    }
+  }
+
+  // ===== 描画 =====
+  function renderStaff() {
+    var area = document.getElementById('staffArea');
+    var html = '<div class="staff-grid">';
+
+    staffData.forEach(function(s, i) {
+      var statusText = s.status === 'working' ? '勤務中' : s.status === 'done' ? '退勤済' : '未出勤';
+      var actionText = s.status === 'none' ? '入室打刻 →' : s.status === 'working' ? '← 退室打刻' : '';
+      var cardClass = 'staff-card ' + s.status + (isProcessing ? ' disabled' : '');
+
+      var timeHtml = '';
+      if (s.clockIn) {
+        timeHtml = '<div class="time-info">';
+        timeHtml += '<span><span class="time-label">入室</span> ' + s.clockIn + '</span>';
+        if (s.clockOut) {
+          timeHtml += '<span><span class="time-label">退室</span> ' + s.clockOut + '</span>';
+        }
+        timeHtml += '</div>';
+      }
+
+      html += '<div class="' + cardClass + '" onclick="handleTap(' + i + ')">';
+      html += '<div class="staff-name">' + s.name + '</div>';
+      html += '<div class="status-row">';
+      html += '<span class="badge ' + s.status + '"><span class="badge-dot"></span>' + statusText + '</span>';
+      if (actionText) {
+        html += '<span class="action-hint">' + actionText + '</span>';
+      }
+      html += '</div>';
+      html += timeHtml;
+      html += '</div>';
+    });
+
+    html += '</div>';
+    area.innerHTML = html;
+  }
+
+  // ===== タップ処理 =====
+  function handleTap(index) {
+    if (isProcessing) return;
+    var s = staffData[index];
+    if (s.status === 'done') return;
+
+    var type = s.status === 'none' ? '入室' : '退室';
+    pendingAction = { name: s.name, type: type };
+    showModal(s.name, type);
+  }
+
+  // ===== モーダル =====
+  function showModal(name, type) {
+    var now = new Date();
+    var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+    document.getElementById('modalTitle').textContent = type === '入室' ? '入室打刻' : '退室打刻';
+    document.getElementById('modalTime').textContent = timeStr;
+    document.getElementById('modalSub').textContent = name + 'さんの' + type + 'を記録しますか？';
+
+    var btn = document.getElementById('modalConfirm');
+    btn.textContent = type === '入室' ? '入室する' : '退室する';
+    btn.className = 'btn ' + (type === '入室' ? 'btn-in' : 'btn-out');
+
+    document.getElementById('modal').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('show');
+    pendingAction = null;
+  }
+
+  // ===== 打刻実行 =====
+  function confirmClock() {
+    if (!pendingAction || isProcessing) return;
+
+    var name = pendingAction.name;
+    var type = pendingAction.type;
+
+    isProcessing = true;
+    closeModal();
+    renderStaff(); // カードをdisabledに
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        isProcessing = false;
+        showToast(result.message, 'success');
+        loadStaff(); // ステータスを再取得
+      })
+      .withFailureHandler(function(err) {
+        isProcessing = false;
+        showToast(err.message, 'error');
+        loadStaff();
+      })
+      .recordClock(name, type);
+  }
+
+  // ===== トースト =====
+  function showToast(msg, type) {
+    var el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.textContent = msg;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(function() { el.remove(); }, 3000);
+  }
+
+  // ===== 初期化 =====
+  loadStaff();
+
+  // 5分ごとにステータスを自動更新
+  setInterval(loadStaff, 5 * 60 * 1000);
+</script>
+</body>
+</html>
