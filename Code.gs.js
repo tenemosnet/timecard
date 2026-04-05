@@ -21,6 +21,7 @@
 const SPREADSHEET_ID = '16ssw5Jfu3y8CepLMVMk_rnI4zBJBFUg8pnlfPYvFEPY';
 const STAFF_NAMES = ['山田 太郎', '佐藤 花子', '田中 一郎']; // ※ 初期設定時のみ使用。以降はシート名で管理
 const LOG_SHEET_NAME = '打刻ログ';
+const NOTES_LOG_SHEET_NAME = '備考ログ';
 const OVERTIME_THRESHOLD = 8;       // 残業基準（時間）
 const LUNCH_DEDUCT_6H = 0.75;      // 6時間以上勤務: 45分控除
 const LUNCH_DEDUCT_8H = 1.0;       // 8時間以上勤務: 60分控除
@@ -34,6 +35,7 @@ function onOpen() {
     .addSeparator()
     .addItem('新しい月へ移行', 'promptNewMonth')
     .addItem('PDF出力（月次）', 'exportPdf')
+    .addItem('備考を復元', 'restoreNotes')
     .addSeparator()
     .addItem('曜日の数式を修復', 'fixWeekdayFormulas')
     .addItem('スタッフ名を変更', 'showStaffHelp')
@@ -69,6 +71,9 @@ function initialize() {
 
   // 打刻ログシート作成
   createLogSheet_(ss);
+
+  // 備考ログシート作成
+  createNotesLogSheet_(ss);
 
   // スタッフ別シート作成（当月）
   const now = new Date();
@@ -119,6 +124,30 @@ function createLogSheet_(ss) {
   // ヘッダー固定
   sheet.setFrozenRows(1);
 
+  return sheet;
+}
+
+// =====================================================================
+//  備考ログシート作成
+// =====================================================================
+function createNotesLogSheet_(ss) {
+  let sheet = ss.getSheetByName(NOTES_LOG_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(NOTES_LOG_SHEET_NAME, 1);
+
+  // ヘッダー
+  sheet.getRange('A1:E1').setValues([['年', '月', 'スタッフ名', '日', '備考内容']]);
+  sheet.getRange('A1:E1').setFontWeight('bold').setBackground('#e2e8f0');
+
+  // 列幅
+  sheet.setColumnWidth(1, 60);
+  sheet.setColumnWidth(2, 40);
+  sheet.setColumnWidth(3, 120);
+  sheet.setColumnWidth(4, 40);
+  sheet.setColumnWidth(5, 300);
+
+  sheet.setFrozenRows(1);
   return sheet;
 }
 
@@ -295,9 +324,9 @@ function getStaffWithStatus() {
     });
   }
 
-  // スタッフ名一覧はシート名から取得（打刻ログ以外）
+  // スタッフ名一覧はシート名から取得（システムシートを除外）
   const sheets = ss.getSheets();
-  const staffNames = sheets.map(s => s.getName()).filter(n => n !== LOG_SHEET_NAME);
+  const staffNames = sheets.map(s => s.getName()).filter(n => n !== LOG_SHEET_NAME && n !== NOTES_LOG_SHEET_NAME);
 
   return staffNames.map(name => {
     let status = 'none';
@@ -344,23 +373,111 @@ function promptNewMonth() {
   const confirm = ui.alert(
     '確認',
     '各スタッフのシートを ' + year + '年' + month + '月に切り替えます。\n' +
-    '備考欄の手入力データはクリアされます。\n\n' +
+    '備考欄は自動バックアップ後にクリアされます。\n\n' +
     '※ 打刻ログの生データは保持されます。\n' +
-    '※ 前月のデータが必要な場合は先にCSVダウンロードしてください。\n\n' +
+    '※ 備考は「備考ログ」シートに保存され、後から復元できます。\n\n' +
     '続行しますか？',
     ui.ButtonSet.OK_CANCEL
   );
   if (confirm !== ui.Button.OK) return;
 
-  // 各スタッフシートの年月を更新
+  // 備考ログシートを取得（なければ作成）
+  let notesLog = ss.getSheetByName(NOTES_LOG_SHEET_NAME);
+  if (!notesLog) notesLog = createNotesLogSheet_(ss);
+
+  // 各スタッフシートの備考をバックアップ → 年月更新
   ss.getSheets().forEach(sheet => {
-    if (sheet.getName() === LOG_SHEET_NAME) return;
+    const name = sheet.getName();
+    if (name === LOG_SHEET_NAME || name === NOTES_LOG_SHEET_NAME) return;
+
+    // 現在の年月を取得（移行前）
+    const curYear = sheet.getRange('D1').getValue();
+    const curMonth = sheet.getRange('F1').getValue();
+
+    // 備考欄をバックアップ
+    const notes = sheet.getRange('H4:H34').getValues();
+    const rows = [];
+    notes.forEach((cell, i) => {
+      if (cell[0] !== '' && cell[0] !== null) {
+        rows.push([curYear, curMonth, name, i + 1, cell[0]]);
+      }
+    });
+    if (rows.length > 0) {
+      // 同じ年月・スタッフの既存バックアップを削除（上書き相当）
+      if (notesLog.getLastRow() > 1) {
+        const existing = notesLog.getRange(2, 1, notesLog.getLastRow() - 1, 5).getValues();
+        for (let r = existing.length - 1; r >= 0; r--) {
+          if (existing[r][0] == curYear && existing[r][1] == curMonth && existing[r][2] === name) {
+            notesLog.deleteRow(r + 2);
+          }
+        }
+      }
+      notesLog.getRange(notesLog.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
+    }
+
+    // 年月更新＆備考クリア
     sheet.getRange('D1').setValue(year);
     sheet.getRange('F1').setValue(month);
-    sheet.getRange('H4:H34').clearContent(); // 備考欄クリア
+    sheet.getRange('H4:H34').clearContent();
   });
 
   ui.alert('完了', '全スタッフのシートを ' + year + '年' + month + '月に更新しました。', ui.ButtonSet.OK);
+}
+
+// =====================================================================
+//  PDF出力（月次）
+// =====================================================================
+function restoreNotes() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  const notesLog = ss.getSheetByName(NOTES_LOG_SHEET_NAME);
+  if (!notesLog || notesLog.getLastRow() <= 1) {
+    ui.alert('備考ログ', '復元できる備考データがありません。', ui.ButtonSet.OK);
+    return;
+  }
+
+  const staffSheets = ss.getSheets().filter(s =>
+    s.getName() !== LOG_SHEET_NAME && s.getName() !== NOTES_LOG_SHEET_NAME
+  );
+  if (staffSheets.length === 0) return;
+
+  // 最初のスタッフシートから現在の表示年月を取得
+  const year = staffSheets[0].getRange('D1').getValue();
+  const month = staffSheets[0].getRange('F1').getValue();
+
+  const confirm = ui.alert(
+    '備考を復元',
+    year + '年' + month + '月の備考データを復元します。\n' +
+    '現在の備考欄は上書きされます。続行しますか？',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (confirm !== ui.Button.OK) return;
+
+  // 備考ログから該当年月のデータを読み取り
+  const logData = notesLog.getRange(2, 1, notesLog.getLastRow() - 1, 5).getValues();
+  let restoredCount = 0;
+
+  staffSheets.forEach(sheet => {
+    const staffName = sheet.getName();
+    const matches = logData.filter(row =>
+      row[0] == year && row[1] == month && row[2] === staffName
+    );
+    matches.forEach(row => {
+      const day = row[3]; // 日（1〜31）
+      const note = row[4];
+      if (day >= 1 && day <= 31) {
+        sheet.getRange(day + 3, 8).setValue(note); // H列、行4が1日
+        restoredCount++;
+      }
+    });
+  });
+
+  if (restoredCount > 0) {
+    ui.alert('復元完了', year + '年' + month + '月の備考を' + restoredCount + '件復元しました。', ui.ButtonSet.OK);
+  } else {
+    ui.alert('備考ログ', year + '年' + month + '月の備考データは見つかりませんでした。', ui.ButtonSet.OK);
+  }
 }
 
 // =====================================================================
@@ -371,7 +488,7 @@ function exportPdf() {
   const ui = SpreadsheetApp.getUi();
 
   // スタッフシート一覧を取得
-  const staffSheets = ss.getSheets().filter(s => s.getName() !== LOG_SHEET_NAME);
+  const staffSheets = ss.getSheets().filter(s => s.getName() !== LOG_SHEET_NAME && s.getName() !== NOTES_LOG_SHEET_NAME);
   if (staffSheets.length === 0) {
     ui.alert('エラー', 'スタッフシートが見つかりません。先に初期設定を実行してください。', ui.ButtonSet.OK);
     return;
