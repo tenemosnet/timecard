@@ -18,7 +18,7 @@
 // =====================================================================
 //  設定（ここを書き換えてカスタマイズ）
 // =====================================================================
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // ← スプレッドシートのURLから取得して貼り付け
+const SPREADSHEET_ID = '16ssw5Jfu3y8CepLMVMk_rnI4zBJBFUg8pnlfPYvFEPY';
 const STAFF_NAMES = ['山田 太郎', '佐藤 花子', '田中 一郎']; // ※ 初期設定時のみ使用。以降はシート名で管理
 const LOG_SHEET_NAME = '打刻ログ';
 const OVERTIME_THRESHOLD = 8;       // 残業基準（時間）
