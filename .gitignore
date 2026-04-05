@@ -1,2 +1,5 @@
 *.zip
 *.zip:Zone.Identifier
+*.key
+*.key:Zone.Identifier
+config.php
