@@ -33,6 +33,7 @@ function onOpen() {
     .addItem('初期設定（初回のみ）', 'initialize')
     .addSeparator()
     .addItem('新しい月へ移行', 'promptNewMonth')
+    .addItem('曜日の数式を修復', 'fixWeekdayFormulas')
     .addItem('スタッフ名を変更', 'showStaffHelp')
     .addToUi();
 }
@@ -152,8 +153,8 @@ function createStaffSheet_(ss, staffName, year, month) {
     );
     sheet.getRange(row, 1).setNumberFormat('m/d');
 
-    // B列: 曜日
-    sheet.getRange(row, 2).setFormula(`=IF(A${row}="","",TEXT(A${row},"aaa"))`);
+    // B列: 曜日（地域設定に依存しない方式）
+    sheet.getRange(row, 2).setFormula(`=IF(A${row}="","",CHOOSE(WEEKDAY(A${row}),"日","月","火","水","木","金","土"))`);
 
     // C列: 入室時刻（打刻ログから自動取得）
     sheet.getRange(row, 3).setFormula(
@@ -358,6 +359,33 @@ function promptNewMonth() {
   });
 
   ui.alert('完了', '全スタッフのシートを ' + year + '年' + month + '月に更新しました。', ui.ButtonSet.OK);
+}
+
+// =====================================================================
+//  曜日の数式を修復（TEXT→CHOOSE方式に変換）
+// =====================================================================
+function fixWeekdayFormulas() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  const confirm = ui.alert(
+    '曜日の数式を修復',
+    '全スタッフシートのB列（曜日）の数式を修復します。\n続行しますか？',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (confirm !== ui.Button.OK) return;
+
+  ss.getSheets().forEach(sheet => {
+    if (sheet.getName() === LOG_SHEET_NAME) return;
+    for (let i = 0; i < 31; i++) {
+      const row = i + 4;
+      sheet.getRange(row, 2).setFormula(
+        '=IF(A' + row + '="","",CHOOSE(WEEKDAY(A' + row + '),"日","月","火","水","木","金","土"))'
+      );
+    }
+  });
+
+  ui.alert('完了', '全スタッフシートの曜日の数式を修復しました。', ui.ButtonSet.OK);
 }
 
 // =====================================================================
