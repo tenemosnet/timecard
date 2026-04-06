@@ -399,7 +399,10 @@ function getStaffWithStatus() {
   }
 
   const sheets = ss.getSheets();
-  const staffNames = sheets.map(s => s.getName()).filter(n => !SYSTEM_SHEET_NAMES.includes(n));
+  const staffNames = sheets
+    .filter(s => !s.isSheetHidden())
+    .map(s => s.getName())
+    .filter(n => !SYSTEM_SHEET_NAMES.includes(n));
 
   return staffNames.map(name => {
     let status = 'none';
@@ -784,9 +787,14 @@ function apiListPDFs_(params) {
         continue;
       }
 
+      // ファイル名からスタッフ名を抽出（例: "飯島祥子_2026年04月_勤怠表.pdf" → "飯島祥子"）
+      const staffMatch = name.match(/^(.+?)_\d{4}年/);
+      const staffName = staffMatch ? staffMatch[1] : '';
+
       results.push({
         fileId: file.getId(),
         fileName: name,
+        staffName: staffName,
         year: year,
         month: monthNum,
         createdAt: file.getDateCreated().toISOString(),
@@ -817,6 +825,7 @@ function apiGetPDFContent_(params) {
 function apiGetStaffList_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const staffNames = ss.getSheets()
+    .filter(s => !s.isSheetHidden())
     .map(s => s.getName())
     .filter(n => !SYSTEM_SHEET_NAMES.includes(n));
 

@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setGenerateButtonsEnabled(false);
         showProgress(true);
+        const batchFileIds = [];
 
         for (let i = 0; i < staffNames.length; i++) {
             const name = staffNames[i];
@@ -53,10 +54,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await generatePDF(name, year, month);
             if (!result.success) {
                 updateProgress(i, staffNames.length, `エラー: ${name} - ${result.error}`);
+            } else if (result.data && result.data.fileId) {
+                batchFileIds.push(result.data.fileId);
             }
         }
 
         updateProgress(staffNames.length, staffNames.length, '全員分のPDF生成が完了しました。');
+
+        // 生成されたPDFを自動ダウンロード
+        for (const fileId of batchFileIds) {
+            triggerDownload(fileId);
+        }
         setGenerateButtonsEnabled(true);
 
         listYear.value = year;
@@ -83,6 +91,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (result.success) {
             updateProgress(1, 1, `${name} のPDF生成が完了しました。`);
+            // 生成されたPDFを自動ダウンロード
+            if (result.data && result.data.fileId) {
+                triggerDownload(result.data.fileId);
+            }
         } else {
             updateProgress(0, 1, `エラー: ${result.error}`);
         }
@@ -302,6 +314,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function setGenerateButtonsEnabled(enabled) {
         btnGenerateAll.disabled = !enabled;
         btnGenerateOne.disabled = !enabled || genStaff.value === '';
+    }
+
+    function triggerDownload(fileId) {
+        const a = document.createElement('a');
+        a.href = 'download.php?id=' + encodeURIComponent(fileId);
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 
     function escapeHtml(str) {

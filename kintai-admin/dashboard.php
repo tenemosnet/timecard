@@ -35,6 +35,7 @@ $currentMonth = (int)date('n');
     <header class="header">
         <h1>勤怠管理 管理者ページ</h1>
         <div class="header-right">
+            <a href="<?= htmlspecialchars(GAS_API_URL) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-primary">打刻画面を開く</a>
             <span class="user-name"><?= $displayName ?></span>
             <a href="logout.php" class="btn btn-sm btn-outline">ログアウト</a>
         </div>
