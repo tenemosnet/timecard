@@ -1154,101 +1154,77 @@ function showStaffHelp() {
 
 // =====================================================================
 //  テストデータ投入（一度だけ実行。完了後この関数は削除してOK）
+//  ステップ1: まず cleanTestData_ で前回の残データを削除
+//  ステップ2: insertTestData_ で打刻ログ＋備考を一括投入
 // =====================================================================
 function insertTestData_AdachiMarch2026() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
   const staffName = '安達あけみ';
 
-  // 安達あけみシートの年月を3月に設定
-  const staffSheet = ss.getSheetByName(staffName);
-  if (staffSheet) {
-    staffSheet.getRange('D2').setValue(2026);
-    staffSheet.getRange('F2').setValue(3);
+  // --- 前回の残データを削除 ---
+  if (logSheet.getLastRow() > 1) {
+    const allData = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
+    const deleteRows = [];
+    for (let i = allData.length - 1; i >= 0; i--) {
+      if (allData[i][1] === staffName) deleteRows.push(i + 2);
+    }
+    for (const r of deleteRows) {
+      logSheet.deleteRow(r);
+    }
   }
 
-  // テストデータ: [月, 日, 開始時刻(HH:MM), 終了時刻(HH:MM), 備考]
-  const records = [
-    [2, 16, '09:00', '17:50', ''],
-    [2, 17, '09:00', '18:00', ''],
-    [2, 19, '09:00', '18:05', ''],
-    [2, 20, '09:00', '18:00', ''],
-    [2, 24, '09:00', '17:56', ''],
-    [2, 26, '09:00', '17:50', ''],
-    [2, 27, '09:00', '17:49', ''],
-    [3,  1, '08:00', '08:35', '7時45分からの作業でしたが、タイムカードが8時からしか入力出来ないため、開始時間8時からになっています。'],
-    [3,  2, '09:00', '17:59', ''],
-    [3,  3, '09:00', '18:08', ''],
-    [3,  5, '09:00', '18:36', ''],
-    [3,  6, '09:00', '17:58', ''],
-    [3, 10, '09:00', '17:54', ''],
-    [3, 11, '09:00', '17:58', ''],
-    [3, 12, '09:00', '18:10', ''],
-    [3, 13, '09:00', '17:47', ''],
-  ];
+  // --- 安達あけみシートの年月を3月に設定 ---
+  const staffSheet = ss.getSheetByName(staffName);
+  if (staffSheet) {
+    staffSheet.getRange('D2:F2').setValues([[2026, '', 3]]);
+  }
 
-  // 2/23の備考（天皇誕生日）は打刻なし・備考のみ
-  const notesOnly = [
-    [2, 23, '天皇誕生日'],
+  // --- 打刻ログ投入 ---
+  const records = [
+    [2,16,'09:00','17:50'], [2,17,'09:00','18:00'], [2,19,'09:00','18:05'],
+    [2,20,'09:00','18:00'], [2,24,'09:00','17:56'], [2,26,'09:00','17:50'],
+    [2,27,'09:00','17:49'], [3,1,'08:00','08:35'],  [3,2,'09:00','17:59'],
+    [3,3,'09:00','18:08'],  [3,5,'09:00','18:36'],  [3,6,'09:00','17:58'],
+    [3,10,'09:00','17:54'], [3,11,'09:00','17:58'], [3,12,'09:00','18:10'],
+    [3,13,'09:00','17:47'],
   ];
 
   const rows = [];
   for (const r of records) {
-    const dateObj = new Date(2026, r[0] - 1, r[1]); // 日付部分
-    const [sh, sm] = r[2].split(':').map(Number);
-    const [eh, em] = r[3].split(':').map(Number);
-
-    const startTime = new Date(2026, r[0] - 1, r[1], sh, sm, 0);
-    const endTime = new Date(2026, r[0] - 1, r[1], eh, em, 0);
-
-    // 入室レコード
-    rows.push([startTime, staffName, '入室', dateObj]);
-    // 退室レコード
-    rows.push([endTime, staffName, '退室', dateObj]);
+    const d = new Date(2026, r[0]-1, r[1]);
+    const [sh,sm] = r[2].split(':').map(Number);
+    const [eh,em] = r[3].split(':').map(Number);
+    rows.push([new Date(2026,r[0]-1,r[1],sh,sm,0), staffName, '入室', d]);
+    rows.push([new Date(2026,r[0]-1,r[1],eh,em,0), staffName, '退室', d]);
   }
 
-  // 打刻ログに一括書き込み
-  if (rows.length > 0) {
-    const startRow = logSheet.getLastRow() + 1;
-    logSheet.getRange(startRow, 1, rows.length, 4).setValues(rows);
+  const startRow = logSheet.getLastRow() + 1;
+  logSheet.getRange(startRow, 1, rows.length, 4).setValues(rows);
+  // フォーマットを範囲一括で設定（セルごとではなく列単位）
+  logSheet.getRange(startRow, 1, rows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+  logSheet.getRange(startRow, 4, rows.length, 1).setNumberFormat('yyyy/MM/dd');
 
-    // 日時フォーマットを設定
-    for (let i = 0; i < rows.length; i++) {
-      logSheet.getRange(startRow + i, 1).setNumberFormat('yyyy/MM/dd HH:mm');
-      logSheet.getRange(startRow + i, 4).setNumberFormat('yyyy/MM/dd');
-    }
-  }
+  SpreadsheetApp.flush();
 
-  // 備考を直接スタッフシートに書き込み（打刻がない日の備考）
+  // --- 備考を書き込み（日付の行位置を一括取得して高速化） ---
   if (staffSheet) {
-    for (const n of notesOnly) {
-      const noteDate = new Date(2026, n[0] - 1, n[1]);
-      // 行5〜35を走査して該当日を探す
-      for (let row = 5; row <= 35; row++) {
-        const cellDate = staffSheet.getRange(row, 1).getValue();
-        if (cellDate instanceof Date &&
-            cellDate.getFullYear() === noteDate.getFullYear() &&
-            cellDate.getMonth() === noteDate.getMonth() &&
-            cellDate.getDate() === noteDate.getDate()) {
-          staffSheet.getRange(row, 9).setValue(n[2]); // I列=備考
-          break;
-        }
-      }
-    }
+    // A5:A35の日付を一括取得
+    const dates = staffSheet.getRange('A5:A35').getValues();
 
-    // 打刻ありの日の備考も書き込み
-    for (const r of records) {
-      if (!r[4]) continue;
-      const noteDate = new Date(2026, r[0] - 1, r[1]);
-      for (let row = 5; row <= 35; row++) {
-        const cellDate = staffSheet.getRange(row, 1).getValue();
-        if (cellDate instanceof Date &&
-            cellDate.getFullYear() === noteDate.getFullYear() &&
-            cellDate.getMonth() === noteDate.getMonth() &&
-            cellDate.getDate() === noteDate.getDate()) {
-          staffSheet.getRange(row, 9).setValue(r[4]);
-          break;
-        }
+    const notesMap = {
+      '2026-02-23': '天皇誕生日',
+      '2026-03-01': '7時45分からの作業でしたが、タイムカードが8時からしか入力出来ないため、開始時間8時からになっています。',
+    };
+
+    for (let i = 0; i < dates.length; i++) {
+      const cellDate = dates[i][0];
+      if (!(cellDate instanceof Date)) continue;
+      const key = cellDate.getFullYear() + '-' +
+        String(cellDate.getMonth()+1).padStart(2,'0') + '-' +
+        String(cellDate.getDate()).padStart(2,'0');
+      if (notesMap[key]) {
+        staffSheet.getRange(i + 5, 9).setValue(notesMap[key]);
       }
     }
   }
@@ -1256,6 +1232,6 @@ function insertTestData_AdachiMarch2026() {
   SpreadsheetApp.getUi().alert('テストデータ投入完了',
     '安達あけみの2026年3月分テストデータ（16日分）を打刻ログに登録しました。\n' +
     'スタッフシートの年月を3月に設定しました。\n\n' +
-    '確認後、この関数（insertTestData_AdachiMarch2026）は削除してください。',
+    '確認後、この関数は削除してください。',
     SpreadsheetApp.getUi().ButtonSet.OK);
 }
