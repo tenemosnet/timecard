@@ -1153,85 +1153,102 @@ function showStaffHelp() {
 }
 
 // =====================================================================
+//  打刻ログから安達あけみのテストデータを削除（先に実行）
+// =====================================================================
+function cleanTestData_AdachiMarch2026() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (logSheet.getLastRow() <= 1) {
+    SpreadsheetApp.getUi().alert('打刻ログにデータがありません。');
+    return;
+  }
+  const allData = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
+  // 安達あけみ以外のデータだけ残す
+  const keep = allData.filter(row => row[1] !== '安達あけみ');
+  // 既存データをクリア
+  logSheet.getRange(2, 1, allData.length, 4).clearContent();
+  // 残すデータを書き戻し
+  if (keep.length > 0) {
+    logSheet.getRange(2, 1, keep.length, 4).setValues(keep);
+  }
+  SpreadsheetApp.getUi().alert('クリーンアップ完了',
+    '打刻ログから安達あけみのデータ ' + (allData.length - keep.length) + ' 件を削除しました。',
+    SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+// =====================================================================
 //  テストデータ投入（一度だけ実行。完了後この関数は削除してOK）
-//  ステップ1: まず cleanTestData_ で前回の残データを削除
-//  ステップ2: insertTestData_ で打刻ログ＋備考を一括投入
+//  スタッフシートに直接値を書き込む方式（高速）
 // =====================================================================
 function insertTestData_AdachiMarch2026() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
   const staffName = '安達あけみ';
-
-  // --- 前回の残データを削除 ---
-  if (logSheet.getLastRow() > 1) {
-    const allData = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
-    const deleteRows = [];
-    for (let i = allData.length - 1; i >= 0; i--) {
-      if (allData[i][1] === staffName) deleteRows.push(i + 2);
-    }
-    for (const r of deleteRows) {
-      logSheet.deleteRow(r);
-    }
+  const sheet = ss.getSheetByName(staffName);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('エラー', '安達あけみのシートが見つかりません。', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
   }
 
-  // --- 安達あけみシートの年月を3月に設定 ---
-  const staffSheet = ss.getSheetByName(staffName);
-  if (staffSheet) {
-    staffSheet.getRange('D2:F2').setValues([[2026, '', 3]]);
-  }
-
-  // --- 打刻ログ投入 ---
-  const records = [
-    [2,16,'09:00','17:50'], [2,17,'09:00','18:00'], [2,19,'09:00','18:05'],
-    [2,20,'09:00','18:00'], [2,24,'09:00','17:56'], [2,26,'09:00','17:50'],
-    [2,27,'09:00','17:49'], [3,1,'08:00','08:35'],  [3,2,'09:00','17:59'],
-    [3,3,'09:00','18:08'],  [3,5,'09:00','18:36'],  [3,6,'09:00','17:58'],
-    [3,10,'09:00','17:54'], [3,11,'09:00','17:58'], [3,12,'09:00','18:10'],
-    [3,13,'09:00','17:47'],
-  ];
-
-  const rows = [];
-  for (const r of records) {
-    const d = new Date(2026, r[0]-1, r[1]);
-    const [sh,sm] = r[2].split(':').map(Number);
-    const [eh,em] = r[3].split(':').map(Number);
-    rows.push([new Date(2026,r[0]-1,r[1],sh,sm,0), staffName, '入室', d]);
-    rows.push([new Date(2026,r[0]-1,r[1],eh,em,0), staffName, '退室', d]);
-  }
-
-  const startRow = logSheet.getLastRow() + 1;
-  logSheet.getRange(startRow, 1, rows.length, 4).setValues(rows);
-  // フォーマットを範囲一括で設定（セルごとではなく列単位）
-  logSheet.getRange(startRow, 1, rows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
-  logSheet.getRange(startRow, 4, rows.length, 1).setNumberFormat('yyyy/MM/dd');
-
+  // 年月を3月に設定
+  sheet.getRange('D2').setValue(2026);
+  sheet.getRange('F2').setValue(3);
   SpreadsheetApp.flush();
 
-  // --- 備考を書き込み（日付の行位置を一括取得して高速化） ---
-  if (staffSheet) {
-    // A5:A35の日付を一括取得
-    const dates = staffSheet.getRange('A5:A35').getValues();
+  // テストデータ: [行インデックス(0=行5), 開始h, 開始m, 終了h, 終了m, 備考]
+  // 行5=2/16(月), 行6=2/17(火), 行7=2/18(水)... 行12=2/23(月)...
+  // 2/16は行5, 2/17は行6, ..., 日付=16+行オフセット
+  // 行5:2/16, 行6:2/17, 行7:2/18, 行8:2/19, 行9:2/20
+  // 行10:2/21, 行11:2/22, 行12:2/23, 行13:2/24, 行14:2/25
+  // 行15:2/26, 行16:2/27, 行17:2/28
+  // 行18:3/1, 行19:3/2, 行20:3/3, 行21:3/4, 行22:3/5, 行23:3/6
+  // 行24:3/7, 行25:3/8, 行26:3/9, 行27:3/10, 行28:3/11
+  // 行29:3/12, 行30:3/13, 行31:3/14, 行32:3/15
 
-    const notesMap = {
-      '2026-02-23': '天皇誕生日',
-      '2026-03-01': '7時45分からの作業でしたが、タイムカードが8時からしか入力出来ないため、開始時間8時からになっています。',
-    };
+  const data = [
+    { row:5,  sh:9, sm:0, eh:17,em:50, note:'' },           // 2/16 月
+    { row:6,  sh:9, sm:0, eh:18,em:0,  note:'' },           // 2/17 火
+    // 2/18 水 - 休み
+    { row:8,  sh:9, sm:0, eh:18,em:5,  note:'' },           // 2/19 木
+    { row:9,  sh:9, sm:0, eh:18,em:0,  note:'' },           // 2/20 金
+    // 2/21 土, 2/22 日 - 休み
+    { row:12, sh:0, sm:0, eh:0, em:0,  note:'天皇誕生日' }, // 2/23 月（備考のみ）
+    { row:13, sh:9, sm:0, eh:17,em:56, note:'' },           // 2/24 火
+    // 2/25 水 - 休み
+    { row:15, sh:9, sm:0, eh:17,em:50, note:'' },           // 2/26 木
+    { row:16, sh:9, sm:0, eh:17,em:49, note:'' },           // 2/27 金
+    // 2/28 土 - 休み
+    { row:18, sh:8, sm:0, eh:8, em:35, note:'7時45分からの作業でしたが、タイムカードが8時からしか入力出来ないため、開始時間8時からになっています。' }, // 3/1 日
+    { row:19, sh:9, sm:0, eh:17,em:59, note:'' },           // 3/2 月
+    { row:20, sh:9, sm:0, eh:18,em:8,  note:'' },           // 3/3 火
+    // 3/4 水 - 休み
+    { row:22, sh:9, sm:0, eh:18,em:36, note:'' },           // 3/5 木
+    { row:23, sh:9, sm:0, eh:17,em:58, note:'' },           // 3/6 金
+    // 3/7 土, 3/8 日, 3/9 月 - 休み
+    { row:27, sh:9, sm:0, eh:17,em:54, note:'' },           // 3/10 火
+    { row:28, sh:9, sm:0, eh:17,em:58, note:'' },           // 3/11 水
+    { row:29, sh:9, sm:0, eh:18,em:10, note:'' },           // 3/12 木
+    { row:30, sh:9, sm:0, eh:17,em:47, note:'' },           // 3/13 金
+    // 3/14 土, 3/15 日 - 休み
+  ];
 
-    for (let i = 0; i < dates.length; i++) {
-      const cellDate = dates[i][0];
-      if (!(cellDate instanceof Date)) continue;
-      const key = cellDate.getFullYear() + '-' +
-        String(cellDate.getMonth()+1).padStart(2,'0') + '-' +
-        String(cellDate.getDate()).padStart(2,'0');
-      if (notesMap[key]) {
-        staffSheet.getRange(i + 5, 9).setValue(notesMap[key]);
-      }
+  // C列(開始)とD列(終了)に時刻を直接書き込み、I列に備考
+  for (const d of data) {
+    if (d.sh === 0 && d.sm === 0 && d.eh === 0 && d.em === 0) {
+      // 備考のみ（打刻なし）
+      sheet.getRange(d.row, 3).setValue('');  // C列クリア
+      sheet.getRange(d.row, 4).setValue('');  // D列クリア
+      if (d.note) sheet.getRange(d.row, 9).setValue(d.note);
+    } else {
+      sheet.getRange(d.row, 3).setValue(new Date(1899,11,30, d.sh,d.sm,0)).setNumberFormat('H:mm');
+      sheet.getRange(d.row, 4).setValue(new Date(1899,11,30, d.eh,d.em,0)).setNumberFormat('H:mm');
+      if (d.note) sheet.getRange(d.row, 9).setValue(d.note);
     }
   }
 
   SpreadsheetApp.getUi().alert('テストデータ投入完了',
-    '安達あけみの2026年3月分テストデータ（16日分）を打刻ログに登録しました。\n' +
-    'スタッフシートの年月を3月に設定しました。\n\n' +
+    '安達あけみの2026年3月分テストデータを直接シートに書き込みました。\n\n' +
+    '定時内時間の合計が 120:35 になることを確認してください。\n' +
+    '管理者ページからPDF生成もお試しください。\n\n' +
     '確認後、この関数は削除してください。',
     SpreadsheetApp.getUi().ButtonSet.OK);
 }
