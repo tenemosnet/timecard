@@ -5,7 +5,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.getElementById('csrf-token').value;
     const staffListRaw = JSON.parse(document.getElementById('staff-list').value || '[]');
-    // staffListRaw は [{name, contractedHours}, ...] の配列
     const staffNames = staffListRaw.map(s => s.name || s);
 
     // --- 要素取得 ---
@@ -25,12 +24,101 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const statusDrive = document.getElementById('status-drive');
 
-    // --- スタッフ選択で「この人だけ生成」ボタンの有効/無効 ---
+    // ===========================
+    // 折り畳み: スタッフ設定
+    // ===========================
+    const staffToggle = document.getElementById('staff-settings-toggle');
+    const staffBody = document.getElementById('staff-settings-body');
+    const staffToggleLabel = document.getElementById('staff-toggle-label');
+
+    staffToggle.addEventListener('click', () => {
+        const isCollapsed = staffBody.classList.contains('collapsed');
+        if (isCollapsed) {
+            staffBody.classList.remove('collapsed');
+            staffBody.classList.add('expanded');
+            staffToggleLabel.textContent = '閉じる';
+        } else {
+            staffBody.classList.remove('expanded');
+            staffBody.classList.add('collapsed');
+            staffToggleLabel.textContent = '開く';
+        }
+    });
+
+    // ===========================
+    // ドラッグ並び替え
+    // ===========================
+    const sortableTbody = document.getElementById('staff-sortable-tbody');
+    let dragRow = null;
+
+    sortableTbody.addEventListener('dragstart', (e) => {
+        dragRow = e.target.closest('tr');
+        if (dragRow) {
+            dragRow.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+    });
+
+    sortableTbody.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const target = e.target.closest('tr');
+        if (target && target !== dragRow && target.parentNode === sortableTbody) {
+            const rect = target.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                sortableTbody.insertBefore(dragRow, target);
+            } else {
+                sortableTbody.insertBefore(dragRow, target.nextSibling);
+            }
+        }
+    });
+
+    sortableTbody.addEventListener('dragend', () => {
+        if (dragRow) {
+            dragRow.classList.remove('dragging');
+            dragRow = null;
+            saveSortOrder();
+        }
+    });
+
+    // ドラッグハンドルでのみドラッグ開始
+    sortableTbody.querySelectorAll('.sortable-row').forEach(row => {
+        row.setAttribute('draggable', 'false');
+        const handle = row.querySelector('.drag-handle');
+        if (handle) {
+            handle.addEventListener('mousedown', () => row.setAttribute('draggable', 'true'));
+            handle.addEventListener('mouseup', () => row.setAttribute('draggable', 'false'));
+        }
+    });
+
+    async function saveSortOrder() {
+        const rows = sortableTbody.querySelectorAll('.sortable-row');
+        const order = [];
+        rows.forEach((row, i) => {
+            order.push({ name: row.dataset.staff, sortOrder: i });
+        });
+
+        try {
+            await fetch('staff_setting.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    csrf_token: csrfToken,
+                    action: 'updateOrder',
+                    order: order,
+                }),
+            });
+        } catch (e) {
+            // 並び替え保存失敗は静かに無視
+        }
+    }
+
+    // ===========================
+    // PDF生成
+    // ===========================
     genStaff.addEventListener('change', () => {
         btnGenerateOne.disabled = genStaff.value === '';
     });
 
-    // --- PDF生成: 全員分 ---
     btnGenerateAll.addEventListener('click', async () => {
         if (staffNames.length === 0) {
             alert('スタッフ一覧が取得できていません。ページを再読み込みしてください。');
@@ -61,7 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateProgress(staffNames.length, staffNames.length, '全員分のPDF生成が完了しました。');
 
-        // 生成されたPDFを自動ダウンロード
         for (const fileId of batchFileIds) {
             triggerDownload(fileId);
         }
@@ -71,7 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadPDFList();
     });
 
-    // --- PDF生成: 個別 ---
     btnGenerateOne.addEventListener('click', async () => {
         const name = genStaff.value;
         if (!name) return;
@@ -91,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (result.success) {
             updateProgress(1, 1, `${name} のPDF生成が完了しました。`);
-            // 生成されたPDFを自動ダウンロード
             if (result.data && result.data.fileId) {
                 triggerDownload(result.data.fileId);
             }
@@ -103,12 +188,44 @@ document.addEventListener('DOMContentLoaded', () => {
         loadPDFList();
     });
 
-    // --- PDF一覧検索 ---
+    // ===========================
+    // PDF一覧
+    // ===========================
     btnSearch.addEventListener('click', () => {
         loadPDFList();
     });
 
-    // --- スタッフ設定: 定時保存 ---
+    // PDF選択バー
+    const pdfActionsBar = document.getElementById('pdf-actions-bar');
+    const pdfSelectAll = document.getElementById('pdf-select-all');
+    const pdfSelectedCount = document.getElementById('pdf-selected-count');
+    const btnDownloadSelected = document.getElementById('btn-download-selected');
+
+    pdfSelectAll.addEventListener('change', () => {
+        const checkboxes = pdfTbody.querySelectorAll('.pdf-checkbox');
+        checkboxes.forEach(cb => { cb.checked = pdfSelectAll.checked; });
+        updateSelectedCount();
+    });
+
+    btnDownloadSelected.addEventListener('click', () => {
+        const checked = pdfTbody.querySelectorAll('.pdf-checkbox:checked');
+        if (checked.length === 0) {
+            alert('ダウンロードするPDFを選択してください。');
+            return;
+        }
+        checked.forEach(cb => {
+            triggerDownload(cb.dataset.fileId);
+        });
+    });
+
+    function updateSelectedCount() {
+        const checked = pdfTbody.querySelectorAll('.pdf-checkbox:checked');
+        pdfSelectedCount.textContent = checked.length + '件選択中';
+    }
+
+    // ===========================
+    // スタッフ設定: 定時保存
+    // ===========================
     document.querySelectorAll('.btn-save-hours').forEach(btn => {
         btn.addEventListener('click', async () => {
             const staffName = btn.dataset.staff;
@@ -146,7 +263,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- スタッフ追加 ---
+    // ===========================
+    // スタッフ追加
+    // ===========================
     const btnAddStaff = document.getElementById('btn-add-staff');
     const staffMessage = document.getElementById('staff-manage-message');
 
@@ -156,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!name) {
             staffMessage.textContent = '氏名を入力してください。';
-            staffMessage.style.color = '#f87171';
+            staffMessage.style.color = '#c45a5a';
             return;
         }
 
@@ -164,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         btnAddStaff.disabled = true;
         staffMessage.textContent = '追加中...';
-        staffMessage.style.color = '#aaa';
+        staffMessage.style.color = '#8a7f6e';
 
         try {
             const res = await fetch('staff_manage.php', {
@@ -181,21 +300,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.success) {
                 staffMessage.textContent = `「${name}」を追加しました。ページを再読み込みします...`;
-                staffMessage.style.color = '#4ade80';
+                staffMessage.style.color = '#5a8f5a';
                 setTimeout(() => location.reload(), 1500);
             } else {
                 staffMessage.textContent = 'エラー: ' + result.error;
-                staffMessage.style.color = '#f87171';
+                staffMessage.style.color = '#c45a5a';
                 btnAddStaff.disabled = false;
             }
         } catch (e) {
             staffMessage.textContent = '通信エラー: ' + e.message;
-            staffMessage.style.color = '#f87171';
+            staffMessage.style.color = '#c45a5a';
             btnAddStaff.disabled = false;
         }
     });
 
-    // --- スタッフ削除 ---
+    // ===========================
+    // スタッフ削除
+    // ===========================
     document.querySelectorAll('.btn-remove-staff').forEach(btn => {
         btn.addEventListener('click', async () => {
             const staffName = btn.dataset.staff;
@@ -220,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await res.json();
 
                 if (result.success) {
-                    const row = document.getElementById('staff-row-' + staffName);
+                    const row = btn.closest('tr');
                     if (row) row.remove();
                 } else {
                     alert('エラー: ' + result.error);
@@ -235,7 +356,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- PDF生成API呼び出し ---
+    // ===========================
+    // スタッフ名前変更
+    // ===========================
+    document.querySelectorAll('.btn-rename-staff').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const oldName = btn.dataset.staff;
+            const newName = prompt(`「${oldName}」の新しい名前を入力してください:`, oldName);
+
+            if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+
+            if (!confirm(`「${oldName}」→「${newName.trim()}」に変更しますか？\n（シート名・打刻ログ・設定がすべて更新されます）`)) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '変更中...';
+
+            try {
+                const res = await fetch('staff_rename.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        csrf_token: csrfToken,
+                        oldName: oldName,
+                        newName: newName.trim(),
+                    }),
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    alert(`「${oldName}」を「${newName.trim()}」に変更しました。\nページを再読み込みします。`);
+                    location.reload();
+                } else {
+                    alert('エラー: ' + result.error);
+                    btn.textContent = '名前変更';
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert('通信エラー: ' + e.message);
+                btn.textContent = '名前変更';
+                btn.disabled = false;
+            }
+        });
+    });
+
+    // ===========================
+    // API呼び出し
+    // ===========================
     async function generatePDF(staffName, year, month) {
         try {
             const res = await fetch('generate.php', {
@@ -254,11 +422,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- PDF一覧取得 ---
     async function loadPDFList() {
         const year = listYear.value;
         const staff = listStaff.value;
-        pdfTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">読み込み中...</td></tr>';
+        pdfTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">読み込み中...</td></tr>';
+        pdfActionsBar.style.display = 'none';
 
         try {
             const params = new URLSearchParams({ year: year });
@@ -268,13 +436,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await res.json();
 
             if (!result.success) {
-                pdfTbody.innerHTML = `<tr><td colspan="5" class="text-center alert-error">${escapeHtml(result.error)}</td></tr>`;
+                pdfTbody.innerHTML = `<tr><td colspan="6" class="text-center alert-error">${escapeHtml(result.error)}</td></tr>`;
                 return;
             }
 
             const data = result.data || [];
             if (data.length === 0) {
-                pdfTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">PDFが見つかりません</td></tr>';
+                pdfTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">PDFが見つかりません</td></tr>';
                 return;
             }
 
@@ -285,22 +453,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
             pdfTbody.innerHTML = data.map(item => `
                 <tr>
+                    <td><input type="checkbox" class="pdf-checkbox" data-file-id="${escapeHtml(item.fileId)}"></td>
                     <td>${item.month}月</td>
                     <td>${escapeHtml(item.staffName || '-')}</td>
                     <td>${escapeHtml(item.fileName)}</td>
-                    <td>${item.createdAt || '-'}</td>
+                    <td>${item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '-'}</td>
                     <td class="actions">
                         <a href="download.php?id=${encodeURIComponent(item.fileId)}" class="btn btn-sm btn-download">DL</a>
                         <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="btn btn-sm btn-view">表示</a>
                     </td>
                 </tr>
             `).join('');
+
+            // チェックボックスイベント
+            pdfActionsBar.style.display = 'flex';
+            pdfSelectAll.checked = false;
+            updateSelectedCount();
+
+            pdfTbody.querySelectorAll('.pdf-checkbox').forEach(cb => {
+                cb.addEventListener('change', updateSelectedCount);
+            });
         } catch (e) {
-            pdfTbody.innerHTML = `<tr><td colspan="5" class="text-center alert-error">通信エラー: ${escapeHtml(e.message)}</td></tr>`;
+            pdfTbody.innerHTML = `<tr><td colspan="6" class="text-center alert-error">通信エラー: ${escapeHtml(e.message)}</td></tr>`;
         }
     }
 
-    // --- ユーティリティ ---
+    // ===========================
+    // ユーティリティ
+    // ===========================
     function showProgress(show) {
         progressArea.style.display = show ? 'block' : 'none';
     }
@@ -331,7 +511,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return div.innerHTML;
     }
 
-    // --- 初期処理: ドライブ接続ステータス確認 ---
+    // ===========================
+    // ドライブ接続確認
+    // ===========================
     async function checkDriveStatus() {
         try {
             const res = await fetch('list_pdfs.php?year=' + new Date().getFullYear());

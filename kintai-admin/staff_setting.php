@@ -17,21 +17,39 @@ if (!verifyCsrfToken($token)) {
     exit;
 }
 
-$staffName = trim($input['staffName'] ?? '');
-$contractedHours = floatval($input['contractedHours'] ?? 0);
-
-if ($staffName === '') {
-    echo json_encode(['success' => false, 'error' => 'スタッフ名を指定してください。']);
-    exit;
-}
-
-if ($contractedHours != 7.5 && $contractedHours != 8) {
-    echo json_encode(['success' => false, 'error' => '定時は7.5または8を指定してください。']);
-    exit;
-}
+$action = $input['action'] ?? '';
 
 try {
     require_once __DIR__ . '/api.php';
+
+    // 並び順更新
+    if ($action === 'updateOrder') {
+        $order = $input['order'] ?? [];
+        if (!is_array($order) || count($order) === 0) {
+            echo json_encode(['success' => false, 'error' => '並び順データが不正です。']);
+            exit;
+        }
+
+        $result = callGasApi('updateStaffOrder', [
+            'order' => $order,
+        ]);
+        echo json_encode($result);
+        exit;
+    }
+
+    // 定時設定保存
+    $staffName = trim($input['staffName'] ?? '');
+    $contractedHours = floatval($input['contractedHours'] ?? 0);
+
+    if ($staffName === '') {
+        echo json_encode(['success' => false, 'error' => 'スタッフ名を指定してください。']);
+        exit;
+    }
+
+    if ($contractedHours != 7.5 && $contractedHours != 8) {
+        echo json_encode(['success' => false, 'error' => '定時は7.5または8を指定してください。']);
+        exit;
+    }
 
     $result = callGasApi('setStaffSetting', [
         'staffName' => $staffName,

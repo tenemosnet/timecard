@@ -46,6 +46,7 @@ function onOpen() {
     .addItem('備考を復元', 'restoreNotes')
     .addSeparator()
     .addItem('曜日の数式を修復', 'fixWeekdayFormulas')
+    .addItem('罫線を一括適用', 'applyBordersToAll')
     .addItem('スタッフ名を変更', 'showStaffHelp')
     .addToUi();
 }
@@ -161,10 +162,11 @@ function createSettingsSheet_(ss) {
   if (sheet) return sheet;
 
   sheet = ss.insertSheet(SETTINGS_SHEET_NAME, 2);
-  sheet.getRange('A1:B1').setValues([['スタッフ名', '定時(時間)']]);
-  sheet.getRange('A1:B1').setFontWeight('bold').setBackground('#e2e8f0');
+  sheet.getRange('A1:C1').setValues([['スタッフ名', '定時(時間)', '表示順']]);
+  sheet.getRange('A1:C1').setFontWeight('bold').setBackground('#e2e8f0');
   sheet.setColumnWidth(1, 150);
   sheet.setColumnWidth(2, 100);
+  sheet.setColumnWidth(3, 80);
   sheet.setFrozenRows(1);
   return sheet;
 }
@@ -317,6 +319,9 @@ function createStaffSheet_(ss, staffName, year, month) {
   // --- 列幅 ---
   [50, 40, 80, 80, 80, 90, 80, 90, 160].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
 
+  // --- 罫線 ---
+  applyBorders_(sheet);
+
   // --- 条件付き書式: 土日の色分け ---
   const dataRange = sheet.getRange('A5:I35');
 
@@ -340,6 +345,55 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.setFrozenRows(4);
 
   return sheet;
+}
+
+// =====================================================================
+//  罫線の適用
+// =====================================================================
+function applyBorders_(sheet) {
+  const border = SpreadsheetApp.BorderStyle.SOLID;
+  const thinColor = '#999999';
+  const headerColor = '#333333';
+
+  // ヘッダー行（行3）: 下線を太め
+  sheet.getRange('A3:I3').setBorder(true, true, true, true, true, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  // 上部合計行（行4）: 全罫線
+  sheet.getRange('A4:I4').setBorder(true, true, true, true, true, null, thinColor, border);
+
+  // データ行（5〜35）: 全セルに細罫線
+  sheet.getRange('A5:I35').setBorder(true, true, true, true, true, true, thinColor, border);
+
+  // 下部合計行（行36）: 上線を太め + 全罫線
+  sheet.getRange('A36:I36').setBorder(true, true, true, true, true, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  // 外枠全体（A3:I36）を太めの枠で囲む
+  sheet.getRange('A3:I36').setBorder(true, true, true, true, null, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+}
+
+// =====================================================================
+//  既存シートへ罫線を一括適用（メニューから実行）
+// =====================================================================
+function applyBordersToAll() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  const confirm = ui.alert(
+    '罫線の適用',
+    '全スタッフシートに罫線を適用します。\n続行しますか？',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (confirm !== ui.Button.OK) return;
+
+  const sheets = ss.getSheets();
+  let count = 0;
+  sheets.forEach(s => {
+    if (SYSTEM_SHEET_NAMES.includes(s.getName())) return;
+    applyBorders_(s);
+    count++;
+  });
+
+  ui.alert('完了', count + '名分のシートに罫線を適用しました。', ui.ButtonSet.OK);
 }
 
 // =====================================================================
@@ -603,6 +657,9 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
     SpreadsheetApp.flush();
   }
 
+  // PDF出力前に罫線を確実に適用
+  applyBorders_(sheet);
+
   // 同名ファイルが既にあれば削除
   const existing = folder.getFilesByName(fileName);
   while (existing.hasNext()) {
@@ -719,6 +776,10 @@ function doPost(e) {
         return jsonResponse_(apiAddStaff_(params));
       case 'removeStaff':
         return jsonResponse_(apiRemoveStaff_(params));
+      case 'updateStaffOrder':
+        return jsonResponse_(apiUpdateStaffOrder_(params));
+      case 'renameStaff':
+        return jsonResponse_(apiRenameStaff_(params));
       default:
         return jsonResponse_({ success: false, error: '不明なアクション: ' + params.action });
     }
@@ -821,7 +882,7 @@ function apiGetPDFContent_(params) {
   };
 }
 
-// --- API: スタッフ一覧取得（定時設定付き） ---
+// --- API: スタッフ一覧取得（定時設定付き・表示順ソート） ---
 function apiGetStaffList_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const staffNames = ss.getSheets()
@@ -829,10 +890,24 @@ function apiGetStaffList_() {
     .map(s => s.getName())
     .filter(n => !SYSTEM_SHEET_NAMES.includes(n));
 
+  // スタッフ設定シートから表示順を取得
+  const settingsSheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  const sortMap = {};
+  if (settingsSheet && settingsSheet.getLastRow() > 1) {
+    const cols = settingsSheet.getLastColumn();
+    const data = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, Math.max(cols, 3)).getValues();
+    data.forEach(row => {
+      sortMap[row[0]] = { contractedHours: row[1] || DEFAULT_CONTRACTED_HOURS, sortOrder: row[2] };
+    });
+  }
+
   const staffList = staffNames.map(name => ({
     name: name,
-    contractedHours: getStaffSetting_(ss, name)
+    contractedHours: (sortMap[name] && sortMap[name].contractedHours) || DEFAULT_CONTRACTED_HOURS,
+    sortOrder: (sortMap[name] && sortMap[name].sortOrder !== '' && sortMap[name].sortOrder !== undefined) ? sortMap[name].sortOrder : 9999
   }));
+
+  staffList.sort((a, b) => a.sortOrder - b.sortOrder);
 
   return { success: true, data: staffList };
 }
@@ -917,6 +992,121 @@ function apiRemoveStaff_(params) {
   return { success: true, data: { staffName: staffName, message: 'シートを非表示にしました（データは保持）' } };
 }
 
+// --- API: スタッフ表示順の更新 ---
+function apiUpdateStaffOrder_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const order = params.order; // [{name: '...', sortOrder: 0}, ...]
+
+  if (!order || !Array.isArray(order)) {
+    return { success: false, error: '並び順データが不正です。' };
+  }
+
+  let settingsSheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (!settingsSheet) settingsSheet = createSettingsSheet_(ss);
+
+  if (settingsSheet.getLastRow() > 1) {
+    const data = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 1).getValues();
+    for (const item of order) {
+      for (let i = 0; i < data.length; i++) {
+        if (data[i][0] === item.name) {
+          settingsSheet.getRange(i + 2, 3).setValue(item.sortOrder);
+          break;
+        }
+      }
+    }
+  }
+
+  return { success: true };
+}
+
+// --- API: スタッフ名の変更 ---
+function apiRenameStaff_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const oldName = (params.oldName || '').trim();
+  const newName = (params.newName || '').trim();
+
+  if (!oldName || !newName) {
+    return { success: false, error: '変更前・変更後の氏名を指定してください。' };
+  }
+  if (oldName === newName) {
+    return { success: false, error: '変更前と変更後の名前が同じです。' };
+  }
+
+  // 変更先の名前が既に使われていないかチェック
+  if (ss.getSheetByName(newName)) {
+    return { success: false, error: '「' + newName + '」という名前のシートが既に存在します。' };
+  }
+
+  // スタッフシートの存在確認
+  const sheet = ss.getSheetByName(oldName);
+  if (!sheet) {
+    return { success: false, error: 'スタッフシートが見つかりません: ' + oldName };
+  }
+
+  // 1. シートタブ名を変更
+  sheet.setName(newName);
+
+  // 2. A1のタイトルを変更
+  sheet.getRange('A1').setValue(newName + 'さんの月間勤怠一覧');
+
+  // 3. C列・D列の数式内のスタッフ名を更新（打刻ログ参照のFILTER数式）
+  for (let row = 5; row <= 35; row++) {
+    const cFormula = sheet.getRange(row, 3).getFormula();
+    if (cFormula) {
+      sheet.getRange(row, 3).setFormula(cFormula.replace(new RegExp(escapeRegex_(oldName), 'g'), newName));
+    }
+    const dFormula = sheet.getRange(row, 4).getFormula();
+    if (dFormula) {
+      sheet.getRange(row, 4).setFormula(dFormula.replace(new RegExp(escapeRegex_(oldName), 'g'), newName));
+    }
+  }
+
+  // 4. I2の定時参照数式を更新
+  sheet.getRange('I2').setFormula(
+    `=IFERROR(INDEX(FILTER('${SETTINGS_SHEET_NAME}'!B:B,'${SETTINGS_SHEET_NAME}'!A:A="${newName}"),1),${DEFAULT_CONTRACTED_HOURS})`
+  );
+
+  // 5. スタッフ設定シートの名前を更新
+  const settingsSheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (settingsSheet && settingsSheet.getLastRow() > 1) {
+    const data = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (data[i][0] === oldName) {
+        settingsSheet.getRange(i + 2, 1).setValue(newName);
+        break;
+      }
+    }
+  }
+
+  // 6. 打刻ログの氏名を更新
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (logSheet && logSheet.getLastRow() > 1) {
+    const logData = logSheet.getRange(2, 2, logSheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < logData.length; i++) {
+      if (logData[i][0] === oldName) {
+        logSheet.getRange(i + 2, 2).setValue(newName);
+      }
+    }
+  }
+
+  // 7. 備考ログの氏名を更新
+  const notesSheet = ss.getSheetByName(NOTES_LOG_SHEET_NAME);
+  if (notesSheet && notesSheet.getLastRow() > 1) {
+    const notesData = notesSheet.getRange(2, 2, notesSheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < notesData.length; i++) {
+      if (notesData[i][0] === oldName) {
+        notesSheet.getRange(i + 2, 2).setValue(newName);
+      }
+    }
+  }
+
+  return { success: true, data: { oldName: oldName, newName: newName, message: '「' + oldName + '」を「' + newName + '」に変更しました。' } };
+}
+
+function escapeRegex_(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // =====================================================================
 //  曜日の数式を修復（TEXT→CHOOSE方式に変換）
 // =====================================================================
@@ -960,4 +1150,112 @@ function showStaffHelp() {
     '4. 「スタッフ設定」シートに定時を設定',
     SpreadsheetApp.getUi().ButtonSet.OK
   );
+}
+
+// =====================================================================
+//  テストデータ投入（一度だけ実行。完了後この関数は削除してOK）
+// =====================================================================
+function insertTestData_AdachiMarch2026() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  const staffName = '安達あけみ';
+
+  // 安達あけみシートの年月を3月に設定
+  const staffSheet = ss.getSheetByName(staffName);
+  if (staffSheet) {
+    staffSheet.getRange('D2').setValue(2026);
+    staffSheet.getRange('F2').setValue(3);
+  }
+
+  // テストデータ: [月, 日, 開始時刻(HH:MM), 終了時刻(HH:MM), 備考]
+  const records = [
+    [2, 16, '09:00', '17:50', ''],
+    [2, 17, '09:00', '18:00', ''],
+    [2, 19, '09:00', '18:05', ''],
+    [2, 20, '09:00', '18:00', ''],
+    [2, 24, '09:00', '17:56', ''],
+    [2, 26, '09:00', '17:50', ''],
+    [2, 27, '09:00', '17:49', ''],
+    [3,  1, '08:00', '08:35', '7時45分からの作業でしたが、タイムカードが8時からしか入力出来ないため、開始時間8時からになっています。'],
+    [3,  2, '09:00', '17:59', ''],
+    [3,  3, '09:00', '18:08', ''],
+    [3,  5, '09:00', '18:36', ''],
+    [3,  6, '09:00', '17:58', ''],
+    [3, 10, '09:00', '17:54', ''],
+    [3, 11, '09:00', '17:58', ''],
+    [3, 12, '09:00', '18:10', ''],
+    [3, 13, '09:00', '17:47', ''],
+  ];
+
+  // 2/23の備考（天皇誕生日）は打刻なし・備考のみ
+  const notesOnly = [
+    [2, 23, '天皇誕生日'],
+  ];
+
+  const rows = [];
+  for (const r of records) {
+    const dateObj = new Date(2026, r[0] - 1, r[1]); // 日付部分
+    const [sh, sm] = r[2].split(':').map(Number);
+    const [eh, em] = r[3].split(':').map(Number);
+
+    const startTime = new Date(2026, r[0] - 1, r[1], sh, sm, 0);
+    const endTime = new Date(2026, r[0] - 1, r[1], eh, em, 0);
+
+    // 入室レコード
+    rows.push([startTime, staffName, '入室', dateObj]);
+    // 退室レコード
+    rows.push([endTime, staffName, '退室', dateObj]);
+  }
+
+  // 打刻ログに一括書き込み
+  if (rows.length > 0) {
+    const startRow = logSheet.getLastRow() + 1;
+    logSheet.getRange(startRow, 1, rows.length, 4).setValues(rows);
+
+    // 日時フォーマットを設定
+    for (let i = 0; i < rows.length; i++) {
+      logSheet.getRange(startRow + i, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+      logSheet.getRange(startRow + i, 4).setNumberFormat('yyyy/MM/dd');
+    }
+  }
+
+  // 備考を直接スタッフシートに書き込み（打刻がない日の備考）
+  if (staffSheet) {
+    for (const n of notesOnly) {
+      const noteDate = new Date(2026, n[0] - 1, n[1]);
+      // 行5〜35を走査して該当日を探す
+      for (let row = 5; row <= 35; row++) {
+        const cellDate = staffSheet.getRange(row, 1).getValue();
+        if (cellDate instanceof Date &&
+            cellDate.getFullYear() === noteDate.getFullYear() &&
+            cellDate.getMonth() === noteDate.getMonth() &&
+            cellDate.getDate() === noteDate.getDate()) {
+          staffSheet.getRange(row, 9).setValue(n[2]); // I列=備考
+          break;
+        }
+      }
+    }
+
+    // 打刻ありの日の備考も書き込み
+    for (const r of records) {
+      if (!r[4]) continue;
+      const noteDate = new Date(2026, r[0] - 1, r[1]);
+      for (let row = 5; row <= 35; row++) {
+        const cellDate = staffSheet.getRange(row, 1).getValue();
+        if (cellDate instanceof Date &&
+            cellDate.getFullYear() === noteDate.getFullYear() &&
+            cellDate.getMonth() === noteDate.getMonth() &&
+            cellDate.getDate() === noteDate.getDate()) {
+          staffSheet.getRange(row, 9).setValue(r[4]);
+          break;
+        }
+      }
+    }
+  }
+
+  SpreadsheetApp.getUi().alert('テストデータ投入完了',
+    '安達あけみの2026年3月分テストデータ（16日分）を打刻ログに登録しました。\n' +
+    'スタッフシートの年月を3月に設定しました。\n\n' +
+    '確認後、この関数（insertTestData_AdachiMarch2026）は削除してください。',
+    SpreadsheetApp.getUi().ButtonSet.OK);
 }

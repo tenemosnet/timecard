@@ -6,7 +6,7 @@ $csrfToken = generateCsrfToken();
 $displayName = htmlspecialchars($_SESSION['display_name'] ?? '管理者');
 
 // スタッフ一覧をGASから取得（定時設定付き）
-$staffList = [];    // [{name, contractedHours}, ...]
+$staffList = [];    // [{name, contractedHours, sortOrder}, ...]
 $staffNames = [];   // [name, ...]
 $staffError = '';
 try {
@@ -87,7 +87,6 @@ $currentMonth = (int)date('n');
                 </div>
             </div>
 
-            <!-- 生成プログレス -->
             <div id="generate-progress" class="progress-area" style="display:none;">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
@@ -123,10 +122,18 @@ $currentMonth = (int)date('n');
                 </div>
             </div>
 
+            <!-- PDF選択アクションバー -->
+            <div id="pdf-actions-bar" class="pdf-actions-bar" style="display:none;">
+                <label><input type="checkbox" id="pdf-select-all"> 全選択</label>
+                <span class="selected-count" id="pdf-selected-count">0件選択中</span>
+                <button id="btn-download-selected" class="btn btn-sm btn-download">選択分をDL</button>
+            </div>
+
             <div id="pdf-list-area">
                 <table class="table" id="pdf-table">
                     <thead>
                         <tr>
+                            <th style="width:30px;"></th>
                             <th>月</th>
                             <th>氏名</th>
                             <th>ファイル名</th>
@@ -135,60 +142,69 @@ $currentMonth = (int)date('n');
                         </tr>
                     </thead>
                     <tbody id="pdf-tbody">
-                        <tr><td colspan="5" class="text-center text-muted">「検索」を押してPDF一覧を取得してください</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted">「検索」を押してPDF一覧を取得してください</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
 
-        <!-- スタッフ設定セクション -->
+        <!-- スタッフ設定セクション（折り畳み） -->
         <section class="card">
-            <h2>スタッフ設定</h2>
-            <table class="table" id="staff-settings-table">
-                <thead>
-                    <tr>
-                        <th>スタッフ名</th>
-                        <th>定時（時間）</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($staffList as $staff): ?>
-                    <tr id="staff-row-<?= htmlspecialchars($staff['name']) ?>">
-                        <td><?= htmlspecialchars($staff['name']) ?></td>
-                        <td>
-                            <select class="staff-hours-select" data-staff="<?= htmlspecialchars($staff['name']) ?>">
-                                <option value="7.5" <?= $staff['contractedHours'] == 7.5 ? 'selected' : '' ?>>7時間30分</option>
-                                <option value="8" <?= $staff['contractedHours'] == 8 ? 'selected' : '' ?>>8時間</option>
-                            </select>
-                        </td>
-                        <td class="actions">
-                            <button class="btn btn-sm btn-secondary btn-save-hours" data-staff="<?= htmlspecialchars($staff['name']) ?>">保存</button>
-                            <button class="btn btn-sm btn-danger btn-remove-staff" data-staff="<?= htmlspecialchars($staff['name']) ?>">削除</button>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-
-            <h3 class="section-subtitle">スタッフ追加</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="new-staff-name">氏名</label>
-                    <input type="text" id="new-staff-name" placeholder="例: 山田太郎">
-                </div>
-                <div class="form-group">
-                    <label for="new-staff-hours">定時</label>
-                    <select id="new-staff-hours">
-                        <option value="8">8時間</option>
-                        <option value="7.5">7時間30分</option>
-                    </select>
-                </div>
-                <div class="form-group form-group-btn">
-                    <button id="btn-add-staff" class="btn btn-primary">追加</button>
-                </div>
+            <div class="collapsible-header" id="staff-settings-toggle">
+                <h2>スタッフ設定</h2>
+                <span class="collapse-toggle" id="staff-toggle-label">開く</span>
             </div>
-            <p id="staff-manage-message" class="text-muted" style="margin-top:0.5rem;"></p>
+            <div class="collapsible-body collapsed" id="staff-settings-body">
+                <p class="text-muted" style="margin-bottom:1rem; font-size:0.85rem;">ドラッグで表示順を変更できます。</p>
+                <table class="table" id="staff-settings-table">
+                    <thead>
+                        <tr>
+                            <th style="width:30px;"></th>
+                            <th>スタッフ名</th>
+                            <th>定時（時間）</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staff-sortable-tbody">
+                        <?php foreach ($staffList as $i => $staff): ?>
+                        <tr class="sortable-row" data-staff="<?= htmlspecialchars($staff['name']) ?>" data-order="<?= $i ?>">
+                            <td><span class="drag-handle">☰</span></td>
+                            <td><?= htmlspecialchars($staff['name']) ?></td>
+                            <td>
+                                <select class="staff-hours-select" data-staff="<?= htmlspecialchars($staff['name']) ?>">
+                                    <option value="7.5" <?= ($staff['contractedHours'] ?? 8) == 7.5 ? 'selected' : '' ?>>7時間30分</option>
+                                    <option value="8" <?= ($staff['contractedHours'] ?? 8) == 8 ? 'selected' : '' ?>>8時間</option>
+                                </select>
+                            </td>
+                            <td class="actions">
+                                <button class="btn btn-sm btn-secondary btn-save-hours" data-staff="<?= htmlspecialchars($staff['name']) ?>">保存</button>
+                                <button class="btn btn-sm btn-rename-staff" data-staff="<?= htmlspecialchars($staff['name']) ?>">名前変更</button>
+                                <button class="btn btn-sm btn-danger btn-remove-staff" data-staff="<?= htmlspecialchars($staff['name']) ?>">削除</button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+
+                <h3 class="section-subtitle">スタッフ追加</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="new-staff-name">氏名</label>
+                        <input type="text" id="new-staff-name" placeholder="例: 山田太郎">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-staff-hours">定時</label>
+                        <select id="new-staff-hours">
+                            <option value="8">8時間</option>
+                            <option value="7.5">7時間30分</option>
+                        </select>
+                    </div>
+                    <div class="form-group form-group-btn">
+                        <button id="btn-add-staff" class="btn btn-primary">追加</button>
+                    </div>
+                </div>
+                <p id="staff-manage-message" class="text-muted" style="margin-top:0.5rem;"></p>
+            </div>
         </section>
 
         <!-- ステータスセクション -->

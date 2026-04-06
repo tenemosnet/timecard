@@ -1,5 +1,6 @@
 /* ========================================
    勤怠管理 管理者ページ - スタイルシート
+   claude.ai風 ライトテーマ
    ======================================== */
 
 /* --- リセット & ベース --- */
@@ -11,13 +12,13 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
-    background: #1a1a2e;
-    color: #e0e0e0;
+    background: #f5f0e8;
+    color: #3d3929;
     line-height: 1.6;
     min-height: 100vh;
 }
 
-a { color: #4f8cff; text-decoration: none; }
+a { color: #b3712d; text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* --- ログインページ --- */
@@ -25,46 +26,49 @@ a:hover { text-decoration: underline; }
     display: flex;
     align-items: center;
     justify-content: center;
+    background: #f5f0e8;
 }
 
 .login-container {
-    background: #16213e;
-    border-radius: 12px;
+    background: #ffffff;
+    border-radius: 16px;
     padding: 2.5rem;
     width: 90%;
     max-width: 400px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     text-align: center;
+    border: 1px solid #e8e0d4;
 }
 
 .login-container h1 {
     font-size: 1.6rem;
-    color: #fff;
+    color: #2d2a24;
     margin-bottom: 0.25rem;
 }
 
 .login-subtitle {
-    color: #888;
+    color: #8a7f6e;
     margin-bottom: 1.5rem;
     font-size: 0.95rem;
 }
 
 /* --- ヘッダー --- */
 .header {
-    background: #16213e;
+    background: #ffffff;
     padding: 1rem 2rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #2a2a4a;
+    border-bottom: 1px solid #e8e0d4;
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .header h1 {
     font-size: 1.2rem;
-    color: #fff;
+    color: #2d2a24;
 }
 
 .header-right {
@@ -74,7 +78,7 @@ a:hover { text-decoration: underline; }
 }
 
 .user-name {
-    color: #aaa;
+    color: #8a7f6e;
     font-size: 0.9rem;
 }
 
@@ -87,28 +91,76 @@ a:hover { text-decoration: underline; }
 
 /* --- カード --- */
 .card {
-    background: #16213e;
-    border-radius: 12px;
+    background: #ffffff;
+    border-radius: 16px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e8e0d4;
 }
 
 .card h2 {
     font-size: 1.1rem;
-    color: #fff;
+    color: #2d2a24;
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid #2a2a4a;
+    border-bottom: 1px solid #ede7dc;
 }
 
 .section-subtitle {
     font-size: 0.95rem;
-    color: #ccc;
+    color: #5a5347;
     margin-top: 1.5rem;
     margin-bottom: 0.75rem;
     padding-top: 0.75rem;
-    border-top: 1px solid #2a2a4a;
+    border-top: 1px solid #ede7dc;
+}
+
+/* --- 折り畳み --- */
+.collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+}
+
+.collapsible-header h2 {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.collapse-toggle {
+    font-size: 0.85rem;
+    color: #8a7f6e;
+    background: #f5f0e8;
+    border: 1px solid #e8e0d4;
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.collapse-toggle:hover {
+    background: #ede7dc;
+}
+
+.collapsible-body {
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.collapsible-body.collapsed {
+    max-height: 0 !important;
+    opacity: 0;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.collapsible-body.expanded {
+    opacity: 1;
+    padding-top: 1rem;
 }
 
 /* --- フォーム --- */
@@ -119,7 +171,7 @@ a:hover { text-decoration: underline; }
 .form-group label {
     display: block;
     margin-bottom: 0.3rem;
-    color: #aaa;
+    color: #6b6358;
     font-size: 0.85rem;
 }
 
@@ -128,10 +180,10 @@ a:hover { text-decoration: underline; }
 .form-group select {
     width: 100%;
     padding: 0.6rem 0.8rem;
-    border: 1px solid #334;
-    border-radius: 8px;
-    background: #0f1629;
-    color: #fff;
+    border: 1px solid #d4cdc0;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #3d3929;
     font-size: 1rem;
     transition: border-color 0.2s;
 }
@@ -139,7 +191,8 @@ a:hover { text-decoration: underline; }
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
-    border-color: #4f8cff;
+    border-color: #b3712d;
+    box-shadow: 0 0 0 3px rgba(179, 113, 45, 0.1);
 }
 
 .form-row {
@@ -164,7 +217,7 @@ a:hover { text-decoration: underline; }
     display: inline-block;
     padding: 0.6rem 1.2rem;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     font-size: 0.95rem;
     color: #fff;
@@ -174,32 +227,38 @@ a:hover { text-decoration: underline; }
 }
 
 .btn:hover { opacity: 0.9; text-decoration: none; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.btn-primary { background: #4f8cff; }
-.btn-primary:hover { background: #3a7ae0; }
+.btn-primary { background: #b3712d; }
+.btn-primary:hover { background: #9a6126; }
 
-.btn-secondary { background: #6c757d; }
-.btn-secondary:hover { background: #5a6268; }
+.btn-secondary { background: #8a7f6e; }
+.btn-secondary:hover { background: #756b5c; }
 
 .btn-outline {
     background: transparent;
-    border: 1px solid #555;
-    color: #ccc;
+    border: 1px solid #d4cdc0;
+    color: #6b6358;
 }
-.btn-outline:hover { background: #2a2a4a; }
+.btn-outline:hover { background: #f5f0e8; }
 
 .btn-sm { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
 .btn-full { width: 100%; }
 
-.btn-download { background: #10b981; }
-.btn-download:hover { background: #059669; }
+.btn-download { background: #5a8f5a; }
+.btn-download:hover { background: #4a7a4a; }
 
-.btn-view { background: #8b5cf6; }
-.btn-view:hover { background: #7c3aed; }
+.btn-view { background: #7a6fa5; }
+.btn-view:hover { background: #695f94; }
 
-.btn-danger { background: #ef4444; }
-.btn-danger:hover { background: #dc2626; }
+.btn-rename-staff { background: #4a7f9f; }
+.btn-rename-staff:hover { background: #3a6f8f; }
+
+.btn-danger { background: #c45a5a; }
+.btn-danger:hover { background: #a94a4a; }
+
+.btn-print { background: #4a7f9f; }
+.btn-print:hover { background: #3a6f8f; }
 
 /* --- テーブル --- */
 .table {
@@ -212,11 +271,11 @@ a:hover { text-decoration: underline; }
 .table td {
     padding: 0.6rem 0.8rem;
     text-align: left;
-    border-bottom: 1px solid #2a2a4a;
+    border-bottom: 1px solid #ede7dc;
 }
 
 .table th {
-    color: #aaa;
+    color: #8a7f6e;
     font-weight: 600;
     font-size: 0.85rem;
     text-transform: uppercase;
@@ -224,7 +283,7 @@ a:hover { text-decoration: underline; }
 }
 
 .table tbody tr:hover {
-    background: #1e2a4a;
+    background: #faf7f2;
 }
 
 .table .actions {
@@ -232,30 +291,63 @@ a:hover { text-decoration: underline; }
     gap: 0.5rem;
 }
 
+.table input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #b3712d;
+}
+
+/* --- ドラッグソート --- */
+.sortable-row {
+    cursor: grab;
+}
+
+.sortable-row:active {
+    cursor: grabbing;
+}
+
+.sortable-row.dragging {
+    opacity: 0.5;
+    background: #f5f0e8;
+}
+
+.drag-handle {
+    cursor: grab;
+    color: #bbb;
+    font-size: 1.1rem;
+    padding: 0 0.3rem;
+    user-select: none;
+}
+
+.drag-handle:hover {
+    color: #888;
+}
+
 /* --- アラート --- */
 .alert {
     padding: 0.75rem 1rem;
-    border-radius: 8px;
+    border-radius: 10px;
     margin-bottom: 1rem;
     font-size: 0.9rem;
 }
 
 .alert-error {
-    background: #3d0a0a;
-    color: #f87171;
-    border: 1px solid #7f1d1d;
+    background: #fdf0f0;
+    color: #a94442;
+    border: 1px solid #f0d0d0;
 }
 
 .alert-warning {
-    background: #3d2e0a;
-    color: #fbbf24;
-    border: 1px solid #92400e;
+    background: #fdf8f0;
+    color: #8a6d3b;
+    border: 1px solid #f0e0c0;
 }
 
 .alert-success {
-    background: #0a3d2a;
-    color: #4ade80;
-    border: 1px solid #166534;
+    background: #f0fdf4;
+    color: #3c763d;
+    border: 1px solid #c0e8c0;
 }
 
 /* --- プログレスバー --- */
@@ -266,14 +358,14 @@ a:hover { text-decoration: underline; }
 .progress-bar {
     width: 100%;
     height: 8px;
-    background: #0f1629;
+    background: #ede7dc;
     border-radius: 4px;
     overflow: hidden;
 }
 
 .progress-fill {
     height: 100%;
-    background: #4f8cff;
+    background: #b3712d;
     border-radius: 4px;
     width: 0%;
     transition: width 0.3s ease;
@@ -282,7 +374,7 @@ a:hover { text-decoration: underline; }
 #progress-text {
     margin-top: 0.5rem;
     font-size: 0.9rem;
-    color: #aaa;
+    color: #8a7f6e;
 }
 
 /* --- ステータス --- */
@@ -290,12 +382,29 @@ a:hover { text-decoration: underline; }
     font-weight: 600;
 }
 
-.status-ok { color: #4ade80; }
-.status-error { color: #f87171; }
+.status-ok { color: #5a8f5a; }
+.status-error { color: #c45a5a; }
+
+/* --- PDF選択バー --- */
+.pdf-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: #faf7f2;
+    border-radius: 10px;
+    border: 1px solid #ede7dc;
+}
+
+.pdf-actions-bar .selected-count {
+    color: #6b6358;
+    font-size: 0.9rem;
+}
 
 /* --- ユーティリティ --- */
 .text-center { text-align: center; }
-.text-muted { color: #666; }
+.text-muted { color: #8a7f6e; }
 
 /* --- レスポンシブ --- */
 @media (max-width: 600px) {
@@ -319,5 +428,10 @@ a:hover { text-decoration: underline; }
 
     .table .actions {
         flex-direction: column;
+    }
+
+    .pdf-actions-bar {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
