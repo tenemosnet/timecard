@@ -23,9 +23,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 const SPREADSHEET_ID = '...';        // 本番スプレッドシートID（必須）
 const STAFF_NAMES = [...];           // 初期設定時のみ使用。以降はシート名で管理
 const LOG_SHEET_NAME = '打刻ログ';
-const OVERTIME_THRESHOLD = 8;        // 残業基準: 8時間超
-const LUNCH_DEDUCT_6H = 0.75;       // 6h以上: 45分控除
-const LUNCH_DEDUCT_8H = 1.0;        // 8h以上: 60分控除
+const SETTINGS_SHEET_NAME = 'スタッフ設定';  // スタッフごとの定時設定
+const DEFAULT_CONTRACTED_HOURS = 8;  // デフォルト定時（7.5 or 8）
+const BREAK_HOURS = 1;               // 休憩時間（固定1時間）
+const CUTOFF_DAY = 15;               // 給与締め日（16日〜翌15日）
 ```
 
 ## GAS-Specific Constraints
@@ -49,4 +50,14 @@ const LUNCH_DEDUCT_8H = 1.0;        // 8h以上: 60分控除
 ## Spreadsheet Structure
 
 - **打刻ログ**: 生データ（記録日時, 氏名, 種別, 日付）。アプリが自動追記。
-- **スタッフ別シート**: シート名＝スタッフ名。D1=年, F1=月で表示月を切り替え。行4-34に日別データ（FILTER数式で打刻ログから自動取得）、行36-41に月次集計。
+- **備考ログ**: 月移行時の備考バックアップ。
+- **スタッフ設定**: スタッフ名と定時（時間）の対応表。管理者ページから変更可能。
+- **スタッフ別シート**: シート名＝スタッフ名。D2=年, F2=月で表示月を切り替え。I2=定時（スタッフ設定シートを参照）。行5-35に日別データ（16日〜翌15日、FILTER数式で打刻ログから自動取得）、行36に月次合計。
+- **列構成（A〜I）**: 日, 曜日, 開始時間, 終了時間, 休憩時間, 定時内時間, 残業時間, 深夜残業時間, 備考
+
+## Admin Page (kintai-admin/)
+
+エックスサーバー上のPHP管理者ページ。PDF生成・ダウンロード・スタッフ設定を管理。
+- **config.php**: DB接続・GAS API設定（.gitignore対象）
+- **GAS API**: doPostエンドポイント経由で通信（APIキー認証）
+- **DB**: tenemosnet_kintai（MySQLユーザー: tenemosnet_time）

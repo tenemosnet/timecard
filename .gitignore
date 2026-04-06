@@ -3,3 +3,5 @@
 *.key
 *.key:Zone.Identifier
 config.php
+*.pdf
+*.png

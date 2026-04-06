@@ -2,7 +2,7 @@
  * ====================================
  *  勤怠管理システム — Google Apps Script
  * ====================================
- * 
+ *
  *  セットアップ手順:
  *  1. Googleスプレッドシートを新規作成
  *  2. メニュー「拡張機能 → Apps Script」を開く
@@ -13,20 +13,26 @@
  *     - 実行するユーザー: 自分
  *     - アクセスできるユーザー: 全員
  *  7. 発行されたURLをタブレットのブラウザで開く
+ *
+ *  給与締め日: 毎月15日（16日〜翌15日が1ヶ月の勤務期間）
+ *  例: 「4月」= 3/16〜4/15
  */
 
 // =====================================================================
 //  設定（ここを書き換えてカスタマイズ）
 // =====================================================================
 const SPREADSHEET_ID = '16ssw5Jfu3y8CepLMVMk_rnI4zBJBFUg8pnlfPYvFEPY';
-const STAFF_NAMES = ['山田 太郎', '佐藤 花子', '田中 一郎']; // ※ 初期設定時のみ使用。以降はシート名で管理
+const STAFF_NAMES = ['飯島祥子', '中井川雪子', '安達あけみ', '佐藤涼子']; // ※ 初期設定時のみ使用。以降はシート名で管理
 const LOG_SHEET_NAME = '打刻ログ';
 const NOTES_LOG_SHEET_NAME = '備考ログ';
+const SETTINGS_SHEET_NAME = 'スタッフ設定';
 const PDF_ROOT_FOLDER_NAME = '勤怠管理PDF';
-const SYSTEM_SHEET_NAMES = [LOG_SHEET_NAME, NOTES_LOG_SHEET_NAME];
-const OVERTIME_THRESHOLD = 8;       // 残業基準（時間）
-const LUNCH_DEDUCT_6H = 0.75;      // 6時間以上勤務: 45分控除
-const LUNCH_DEDUCT_8H = 1.0;       // 8時間以上勤務: 60分控除
+const SYSTEM_SHEET_NAMES = [LOG_SHEET_NAME, NOTES_LOG_SHEET_NAME, SETTINGS_SHEET_NAME];
+const DEFAULT_CONTRACTED_HOURS = 8;  // デフォルト定時（時間）
+const BREAK_HOURS = 1;               // 休憩時間（固定1時間）
+const NIGHT_START = 22;              // 深夜開始 22:00
+const NIGHT_END = 5;                 // 深夜終了 5:00
+const CUTOFF_DAY = 15;               // 給与締め日
 
 // =====================================================================
 //  メニュー
@@ -77,10 +83,14 @@ function initialize() {
   // 備考ログシート作成
   createNotesLogSheet_(ss);
 
+  // スタッフ設定シート作成
+  createSettingsSheet_(ss);
+
   // スタッフ別シート作成（当月）
   const now = new Date();
   STAFF_NAMES.forEach(name => {
     createStaffSheet_(ss, name, now.getFullYear(), now.getMonth() + 1);
+    setStaffSetting_(ss, name, DEFAULT_CONTRACTED_HOURS);
   });
 
   // デフォルトの空シートを削除
@@ -110,20 +120,15 @@ function createLogSheet_(ss) {
   if (!sheet) {
     sheet = ss.insertSheet(LOG_SHEET_NAME, 0);
   } else {
-    return sheet; // 既存なら何もしない
+    return sheet;
   }
 
-  // ヘッダー
   sheet.getRange('A1:D1').setValues([['記録日時', '氏名', '種別', '日付']]);
   sheet.getRange('A1:D1').setFontWeight('bold').setBackground('#e2e8f0');
-
-  // 列幅
   sheet.setColumnWidth(1, 160);
   sheet.setColumnWidth(2, 120);
   sheet.setColumnWidth(3, 80);
   sheet.setColumnWidth(4, 110);
-
-  // ヘッダー固定
   sheet.setFrozenRows(1);
 
   return sheet;
@@ -137,133 +142,202 @@ function createNotesLogSheet_(ss) {
   if (sheet) return sheet;
 
   sheet = ss.insertSheet(NOTES_LOG_SHEET_NAME, 1);
-
-  // ヘッダー
   sheet.getRange('A1:E1').setValues([['年', '月', 'スタッフ名', '日', '備考内容']]);
   sheet.getRange('A1:E1').setFontWeight('bold').setBackground('#e2e8f0');
-
-  // 列幅
   sheet.setColumnWidth(1, 60);
   sheet.setColumnWidth(2, 40);
   sheet.setColumnWidth(3, 120);
   sheet.setColumnWidth(4, 40);
   sheet.setColumnWidth(5, 300);
-
   sheet.setFrozenRows(1);
   return sheet;
 }
 
 // =====================================================================
-//  スタッフ別シート作成
+//  スタッフ設定シート作成
+// =====================================================================
+function createSettingsSheet_(ss) {
+  let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(SETTINGS_SHEET_NAME, 2);
+  sheet.getRange('A1:B1').setValues([['スタッフ名', '定時(時間)']]);
+  sheet.getRange('A1:B1').setFontWeight('bold').setBackground('#e2e8f0');
+  sheet.setColumnWidth(1, 150);
+  sheet.setColumnWidth(2, 100);
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+// =====================================================================
+//  スタッフ設定の読み書き
+// =====================================================================
+function getStaffSetting_(ss, staffName) {
+  const sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() <= 1) return DEFAULT_CONTRACTED_HOURS;
+
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  for (const row of data) {
+    if (row[0] === staffName) return row[1] || DEFAULT_CONTRACTED_HOURS;
+  }
+  return DEFAULT_CONTRACTED_HOURS;
+}
+
+function setStaffSetting_(ss, staffName, contractedHours) {
+  let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (!sheet) sheet = createSettingsSheet_(ss);
+
+  // 既存の行を探す
+  if (sheet.getLastRow() > 1) {
+    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (data[i][0] === staffName) {
+        sheet.getRange(i + 2, 2).setValue(contractedHours);
+        return;
+      }
+    }
+  }
+
+  // 新規追加
+  sheet.appendRow([staffName, contractedHours]);
+}
+
+// =====================================================================
+//  スタッフ別シート作成（16日〜翌15日フォーマット）
 // =====================================================================
 function createStaffSheet_(ss, staffName, year, month) {
-  // 既存シートがあればスキップ
   if (ss.getSheetByName(staffName)) return;
 
   const sheet = ss.insertSheet(staffName);
   const log = LOG_SHEET_NAME;
 
-  // --- 行1: タイトル行 ---
-  sheet.getRange('A1').setValue(staffName).setFontWeight('bold').setFontSize(13);
-  sheet.getRange('C1').setValue('年：');
-  sheet.getRange('D1').setValue(year).setFontWeight('bold');
-  sheet.getRange('E1').setValue('月：');
-  sheet.getRange('F1').setValue(month).setFontWeight('bold');
+  // --- 行1: タイトル ---
+  sheet.getRange('A1').setValue(staffName + 'さんの月間勤怠一覧')
+    .setFontWeight('bold').setFontSize(12);
+  sheet.getRange('A1:I1').merge();
 
-  // --- 行3: ヘッダー ---
-  const headers = ['日付', '曜日', '入室', '退室', '実働(h)', '通常(h)', '残業(h)', '備考'];
-  sheet.getRange('A3:H3').setValues([headers]);
-  sheet.getRange('A3:H3').setFontWeight('bold').setBackground('#e2e8f0');
+  // --- 行2: 年月・定時設定 ---
+  sheet.getRange('C2').setValue('年：');
+  sheet.getRange('D2').setValue(year).setFontWeight('bold');
+  sheet.getRange('E2').setValue('月：');
+  sheet.getRange('F2').setValue(month).setFontWeight('bold');
+  sheet.getRange('H2').setValue('定時：');
+  sheet.getRange('I2').setFormula(
+    `=IFERROR(INDEX(FILTER('${SETTINGS_SHEET_NAME}'!B:B,'${SETTINGS_SHEET_NAME}'!A:A="${staffName}"),1),${DEFAULT_CONTRACTED_HOURS})`
+  );
 
-  // --- 行4〜34: 日別データ（最大31日分） ---
+  // --- 行3: カラムヘッダー ---
+  const headers = ['日', '曜日', '開始時間', '終了時間', '休憩時間', '定時内時間', '残業時間', '深夜残業時間', '備考'];
+  sheet.getRange('A3:I3').setValues([headers]);
+  sheet.getRange('A3:I3').setFontWeight('bold').setBackground('#e2e8f0')
+    .setHorizontalAlignment('center');
+
+  // --- 行4: 上部合計行 ---
+  sheet.getRange('E4').setValue('合計').setFontWeight('bold').setHorizontalAlignment('center');
+  // 合計の数式は下部合計を参照（行36）
+  sheet.getRange('F4').setFormula('=F36').setNumberFormat('[h]:mm');
+  // 上部合計行の注記なし（1分単位合計）
+  sheet.getRange('A4:I4').setBackground('#f8f9fa');
+
+  // --- 行5〜35: 日別データ（31行分、16日〜翌15日） ---
   for (let i = 0; i < 31; i++) {
-    const row = i + 4;
-    const dayNum = i + 1;
+    const row = i + 5;
+    const dayOffset = i; // 0=16日目, 1=17日目, ...
 
-    // A列: 日付（月の日数を超えたら空白）
+    // A列: 日付
+    // 前月16日からの日付を計算: DATE(year, month-1, 16+dayOffset)
+    // 月の最終日（翌月15日）を超えたら空白
     sheet.getRange(row, 1).setFormula(
-      `=IF(${dayNum}<=DAY(EOMONTH(DATE(D1,F1,1),0)),DATE(D1,F1,${dayNum}),"")`
+      `=LET(startDate,DATE(D2,F2-1,16),d,startDate+${dayOffset},endDate,DATE(D2,F2,${CUTOFF_DAY}),IF(d<=endDate,d,""))`
     );
+    // 日付表示: 月が変わったら "m/d"、同じ月なら "d" のみ
+    // → カスタム表示は数式で制御（表示用にTEXTで整形）
     sheet.getRange(row, 1).setNumberFormat('m/d');
 
-    // B列: 曜日（地域設定に依存しない方式）
-    sheet.getRange(row, 2).setFormula(`=IF(A${row}="","",CHOOSE(WEEKDAY(A${row}),"日","月","火","水","木","金","土"))`);
+    // B列: 曜日
+    sheet.getRange(row, 2).setFormula(
+      `=IF(A${row}="","",CHOOSE(WEEKDAY(A${row}),"日","月","火","水","木","金","土"))`
+    );
 
-    // C列: 入室時刻（打刻ログから自動取得）
+    // C列: 開始時間（打刻ログから取得）
     sheet.getRange(row, 3).setFormula(
-      `=IFERROR(INDEX(FILTER('${log}'!$A:$A,'${log}'!$D:$D=A${row},'${log}'!$B:$B=$A$1,'${log}'!$C:$C="入室"),1),"")`
+      `=IFERROR(INDEX(FILTER('${log}'!$A:$A,'${log}'!$D:$D=A${row},'${log}'!$B:$B="${staffName}",'${log}'!$C:$C="入室"),1),"")`
     );
     sheet.getRange(row, 3).setNumberFormat('H:mm');
 
-    // D列: 退室時刻（打刻ログから自動取得）
+    // D列: 終了時間（打刻ログから取得）
     sheet.getRange(row, 4).setFormula(
-      `=IFERROR(INDEX(FILTER('${log}'!$A:$A,'${log}'!$D:$D=A${row},'${log}'!$B:$B=$A$1,'${log}'!$C:$C="退室"),1),"")`
+      `=IFERROR(INDEX(FILTER('${log}'!$A:$A,'${log}'!$D:$D=A${row},'${log}'!$B:$B="${staffName}",'${log}'!$C:$C="退室"),1),"")`
     );
     sheet.getRange(row, 4).setNumberFormat('H:mm');
 
-    // E列: 実働時間（昼休み控除後）
+    // E列: 休憩時間（出退勤があれば固定1時間）
     sheet.getRange(row, 5).setFormula(
-      `=IF(AND(C${row}<>"",D${row}<>""),LET(raw,(D${row}-C${row})*24,lunch,IF(raw>=${OVERTIME_THRESHOLD},${LUNCH_DEDUCT_8H},IF(raw>=6,${LUNCH_DEDUCT_6H},0)),MAX(raw-lunch,0)),"")`
+      `=IF(AND(C${row}<>"",D${row}<>""),TIME(${BREAK_HOURS},0,0),"")`
     );
-    sheet.getRange(row, 5).setNumberFormat('0.00');
+    sheet.getRange(row, 5).setNumberFormat('H:mm');
 
-    // F列: 通常勤務
-    sheet.getRange(row, 6).setFormula(`=IF(E${row}="","",MIN(E${row},${OVERTIME_THRESHOLD}))`);
-    sheet.getRange(row, 6).setNumberFormat('0.00');
+    // F列: 定時内時間 = MIN(実働時間, 定時)
+    // 実働 = 終了 - 開始 - 休憩
+    sheet.getRange(row, 6).setFormula(
+      `=IF(AND(C${row}<>"",D${row}<>""),MIN(D${row}-C${row}-E${row}, $I$2/24),"")`
+    );
+    sheet.getRange(row, 6).setNumberFormat('H:mm');
 
-    // G列: 残業
-    sheet.getRange(row, 7).setFormula(`=IF(E${row}="","",MAX(E${row}-${OVERTIME_THRESHOLD},0))`);
-    sheet.getRange(row, 7).setNumberFormat('0.00');
+    // G列: 残業時間 = MAX(実働 - 定時, 0)
+    sheet.getRange(row, 7).setFormula(
+      `=IF(AND(C${row}<>"",D${row}<>""),MAX(D${row}-C${row}-E${row}-$I$2/24, 0),"")`
+    );
+    sheet.getRange(row, 7).setNumberFormat('H:mm');
 
-    // H列: 備考（手動入力用、空白のまま）
+    // H列: 深夜残業時間（22:00〜5:00の勤務時間）
+    // 終了時間が22:00を超えた場合: MIN(終了,翌5:00) - MAX(開始,22:00)
+    sheet.getRange(row, 8).setFormula(
+      `=IF(AND(C${row}<>"",D${row}<>""),` +
+      `IF(HOUR(D${row})>=22,(D${row}-TIME(22,0,0)),` +
+      `IF(AND(HOUR(D${row})<5,D${row}<C${row}),(TIME(5,0,0)-TIME(0,0,0))-(TIME(22,0,0)-D${row}),` +
+      `0)),"")`
+    );
+    sheet.getRange(row, 8).setNumberFormat('H:mm');
+
+    // I列: 備考（手動入力用）
   }
 
-  // --- 行36〜41: 月次集計 ---
-  sheet.getRange('A36').setValue('【月次集計】').setFontWeight('bold').setFontSize(11);
-  sheet.getRange('A36:H36').setBackground('#f1f5f9');
-
-  const summaryRows = [
-    ['出勤日数',       '=COUNTA(FILTER(C4:C34,C4:C34<>""))',  '日'],
-    ['通常勤務合計',   '=SUM(F4:F34)',                          '時間'],
-    ['残業合計',       '=SUM(G4:G34)',                          '時間'],
-    ['昼休み控除合計', `=SUMPRODUCT((E4:E34<>"")*(IF((D4:D34-C4:C34)*24>=${OVERTIME_THRESHOLD},${LUNCH_DEDUCT_8H},IF((D4:D34-C4:C34)*24>=6,${LUNCH_DEDUCT_6H},0))))`, '時間'],
-    ['総勤務時間',     '=B38+B39',                              '時間'],
-  ];
-
-  summaryRows.forEach((r, i) => {
-    const row = 37 + i;
-    sheet.getRange(row, 1).setValue(r[0]).setFontWeight('bold');
-    sheet.getRange(row, 2).setFormula(r[1]).setNumberFormat('0.00');
-    sheet.getRange(row, 3).setValue(r[2]);
-  });
-
-  // 総勤務時間を強調
-  sheet.getRange('A41:C41').setFontWeight('bold').setBackground('#dbeafe');
+  // --- 行36: 下部合計行 ---
+  sheet.getRange('E36').setValue('合計').setFontWeight('bold').setHorizontalAlignment('center');
+  // 1分単位の合計（定時内・残業・深夜残業）
+  sheet.getRange('F36').setFormula('=SUMPRODUCT((F5:F35<>"")*F5:F35)');
+  sheet.getRange('F36').setNumberFormat('[h]:mm').setFontWeight('bold');
+  sheet.getRange('G36').setFormula('=SUMPRODUCT((G5:G35<>"")*G5:G35)');
+  sheet.getRange('G36').setNumberFormat('[h]:mm').setFontWeight('bold');
+  sheet.getRange('H36').setFormula('=SUMPRODUCT((H5:H35<>"")*H5:H35)');
+  sheet.getRange('H36').setNumberFormat('[h]:mm').setFontWeight('bold');
+  sheet.getRange('A36:I36').setBackground('#f8f9fa');
 
   // --- 列幅 ---
-  [80, 50, 80, 80, 80, 80, 80, 160].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+  [50, 40, 80, 80, 80, 90, 80, 90, 160].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
 
   // --- 条件付き書式: 土日の色分け ---
-  const dataRange = sheet.getRange('A4:H34');
+  const dataRange = sheet.getRange('A5:I35');
 
   const sundayRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=WEEKDAY($A4)=1')
+    .whenFormulaSatisfied('=AND($A5<>"",WEEKDAY($A5)=1)')
     .setFontColor('#dc2626')
-    .setBackground('#fef2f2')
+    .setBackground('#ffe0e0')
     .setRanges([dataRange])
     .build();
 
   const saturdayRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=WEEKDAY($A4)=7')
+    .whenFormulaSatisfied('=AND($A5<>"",WEEKDAY($A5)=7)')
     .setFontColor('#2563eb')
-    .setBackground('#eff6ff')
+    .setBackground('#e0f0ff')
     .setRanges([dataRange])
     .build();
 
   sheet.setConditionalFormatRules([sundayRule, saturdayRule]);
 
   // ヘッダー固定
-  sheet.setFrozenRows(3);
+  sheet.setFrozenRows(4);
 
   return sheet;
 }
@@ -284,7 +358,7 @@ function recordClock(staffName, type) {
     const data = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
     for (const row of data) {
       if (!row[0]) continue;
-      const rowDate = new Date(row[3]); // D列: 日付
+      const rowDate = new Date(row[3]);
       if (rowDate.getTime() === today.getTime() && row[1] === staffName && row[2] === type) {
         throw new Error(staffName + 'さんは本日すでに' + type + '打刻済みです');
       }
@@ -294,7 +368,6 @@ function recordClock(staffName, type) {
   // 打刻ログに追記
   logSheet.appendRow([now, staffName, type, today]);
 
-  // セルの書式設定
   const lastRow = logSheet.getLastRow();
   logSheet.getRange(lastRow, 1).setNumberFormat('yyyy/MM/dd HH:mm');
   logSheet.getRange(lastRow, 4).setNumberFormat('yyyy/MM/dd');
@@ -315,7 +388,6 @@ function getStaffWithStatus() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 打刻ログから本日分を取得
   let todayLogs = [];
   if (logSheet && logSheet.getLastRow() > 1) {
     const data = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
@@ -326,7 +398,6 @@ function getStaffWithStatus() {
     });
   }
 
-  // スタッフ名一覧はシート名から取得（システムシートを除外）
   const sheets = ss.getSheets();
   const staffNames = sheets.map(s => s.getName()).filter(n => !SYSTEM_SHEET_NAMES.includes(n));
 
@@ -371,10 +442,10 @@ function promptNewMonth() {
     return;
   }
 
-  // 確認
   const confirm = ui.alert(
     '確認',
     '各スタッフのシートを ' + year + '年' + month + '月に切り替えます。\n' +
+    '（勤務期間: ' + (month === 1 ? 12 : month - 1) + '/16〜' + month + '/15）\n\n' +
     '備考欄は自動バックアップ後にクリアされます。\n\n' +
     '※ 打刻ログの生データは保持されます。\n' +
     '※ 備考は「備考ログ」シートに保存され、後から復元できます。\n\n' +
@@ -383,21 +454,18 @@ function promptNewMonth() {
   );
   if (confirm !== ui.Button.OK) return;
 
-  // 備考ログシートを取得（なければ作成）
   let notesLog = ss.getSheetByName(NOTES_LOG_SHEET_NAME);
   if (!notesLog) notesLog = createNotesLogSheet_(ss);
 
-  // 各スタッフシートの備考をバックアップ → 年月更新
   ss.getSheets().forEach(sheet => {
     const name = sheet.getName();
     if (SYSTEM_SHEET_NAMES.includes(name)) return;
 
-    // 現在の年月を取得（移行前）
-    const curYear = sheet.getRange('D1').getValue();
-    const curMonth = sheet.getRange('F1').getValue();
+    const curYear = sheet.getRange('D2').getValue();
+    const curMonth = sheet.getRange('F2').getValue();
 
-    // 備考欄をバックアップ
-    const notes = sheet.getRange('H4:H34').getValues();
+    // 備考欄（I列）をバックアップ
+    const notes = sheet.getRange('I5:I35').getValues();
     const rows = [];
     notes.forEach((cell, i) => {
       if (cell[0] !== '' && cell[0] !== null) {
@@ -405,7 +473,6 @@ function promptNewMonth() {
       }
     });
     if (rows.length > 0) {
-      // 同じ年月・スタッフの既存バックアップを削除（上書き相当）
       if (notesLog.getLastRow() > 1) {
         const existing = notesLog.getRange(2, 1, notesLog.getLastRow() - 1, 5).getValues();
         for (let r = existing.length - 1; r >= 0; r--) {
@@ -418,16 +485,17 @@ function promptNewMonth() {
     }
 
     // 年月更新＆備考クリア
-    sheet.getRange('D1').setValue(year);
-    sheet.getRange('F1').setValue(month);
-    sheet.getRange('H4:H34').clearContent();
+    sheet.getRange('D2').setValue(year);
+    sheet.getRange('F2').setValue(month);
+    sheet.getRange('I5:I35').clearContent();
   });
 
-  ui.alert('完了', '全スタッフのシートを ' + year + '年' + month + '月に更新しました。', ui.ButtonSet.OK);
+  ui.alert('完了', '全スタッフのシートを ' + year + '年' + month + '月に更新しました。\n' +
+    '（勤務期間: ' + (month === 1 ? 12 : month - 1) + '/16〜' + month + '/15）', ui.ButtonSet.OK);
 }
 
 // =====================================================================
-//  PDF出力（月次）
+//  備考を復元
 // =====================================================================
 function restoreNotes() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -444,9 +512,8 @@ function restoreNotes() {
   );
   if (staffSheets.length === 0) return;
 
-  // 最初のスタッフシートから現在の表示年月を取得
-  const year = staffSheets[0].getRange('D1').getValue();
-  const month = staffSheets[0].getRange('F1').getValue();
+  const year = staffSheets[0].getRange('D2').getValue();
+  const month = staffSheets[0].getRange('F2').getValue();
 
   const confirm = ui.alert(
     '備考を復元',
@@ -456,7 +523,6 @@ function restoreNotes() {
   );
   if (confirm !== ui.Button.OK) return;
 
-  // 備考ログから該当年月のデータを読み取り
   const logData = notesLog.getRange(2, 1, notesLog.getLastRow() - 1, 5).getValues();
   let restoredCount = 0;
 
@@ -466,10 +532,10 @@ function restoreNotes() {
       row[0] == year && row[1] == month && row[2] === staffName
     );
     matches.forEach(row => {
-      const day = row[3]; // 日（1〜31）
+      const day = row[3]; // 日（1〜31、行番号のオフセット）
       const note = row[4];
       if (day >= 1 && day <= 31) {
-        sheet.getRange(day + 3, 8).setValue(note); // H列、行4が1日
+        sheet.getRange(day + 4, 9).setValue(note); // I列（9列目）、行5が1番目
         restoredCount++;
       }
     });
@@ -523,24 +589,24 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   const monthStr = String(month).padStart(2, '0');
   const fileName = staffName + '_' + year + '年' + monthStr + '月_勤怠表.pdf';
 
-  // シートのD1/F1が指定年月と異なる場合、一時変更
-  const origYear = sheet.getRange('D1').getValue();
-  const origMonth = sheet.getRange('F1').getValue();
+  // シートのD2/F2が指定年月と異なる場合、一時変更
+  const origYear = sheet.getRange('D2').getValue();
+  const origMonth = sheet.getRange('F2').getValue();
   const needRestore = (origYear != year || origMonth != month);
 
   if (needRestore) {
-    sheet.getRange('D1').setValue(year);
-    sheet.getRange('F1').setValue(month);
-    SpreadsheetApp.flush(); // 数式再計算を待つ
+    sheet.getRange('D2').setValue(year);
+    sheet.getRange('F2').setValue(month);
+    SpreadsheetApp.flush();
   }
 
-  // 同名ファイルが既にあれば削除（上書き相当）
+  // 同名ファイルが既にあれば削除
   const existing = folder.getFilesByName(fileName);
   while (existing.hasNext()) {
     existing.next().setTrashed(true);
   }
 
-  // PDF生成
+  // PDF生成（A1:I36 = タイトル〜下部合計行）
   const url = 'https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?' +
     'format=pdf' +
     '&gid=' + sheet.getSheetId() +
@@ -552,7 +618,7 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
     '&sheetnames=false' +
     '&pagenum=UNDEFINED' +
     '&fzr=true' +
-    '&range=A1:H41';
+    '&range=A1:I36';
 
   const response = UrlFetchApp.fetch(url, {
     headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
@@ -561,10 +627,9 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   const blob = response.getBlob().setName(fileName);
   const file = folder.createFile(blob);
 
-  // 年月を元に戻す
   if (needRestore) {
-    sheet.getRange('D1').setValue(origYear);
-    sheet.getRange('F1').setValue(origMonth);
+    sheet.getRange('D2').setValue(origYear);
+    sheet.getRange('F2').setValue(origMonth);
     SpreadsheetApp.flush();
   }
 
@@ -591,8 +656,8 @@ function exportPdf() {
     return;
   }
 
-  const year = staffSheets[0].getRange('D1').getValue();
-  const month = staffSheets[0].getRange('F1').getValue();
+  const year = staffSheets[0].getRange('D2').getValue();
+  const month = staffSheets[0].getRange('F2').getValue();
   const staffNames = staffSheets.map(s => s.getName()).join('、');
 
   const confirm = ui.alert(
@@ -616,7 +681,7 @@ function exportPdf() {
     'PDF出力完了',
     createdFiles.length + '名分のPDFを出力しました。\n\n' +
     '保存先: Googleドライブ\n' +
-    '  📁 ' + PDF_ROOT_FOLDER_NAME + ' / ' + year + ' / ' + String(month).padStart(2, '0') + '\n\n' +
+    '  ' + PDF_ROOT_FOLDER_NAME + ' / ' + year + ' / ' + String(month).padStart(2, '0') + '\n\n' +
     '出力ファイル:\n' +
     createdFiles.map(name => '  ・' + name).join('\n'),
     ui.ButtonSet.OK
@@ -645,6 +710,12 @@ function doPost(e) {
         return jsonResponse_(apiGetPDFContent_(params));
       case 'getStaffList':
         return jsonResponse_(apiGetStaffList_());
+      case 'setStaffSetting':
+        return jsonResponse_(apiSetStaffSetting_(params));
+      case 'addStaff':
+        return jsonResponse_(apiAddStaff_(params));
+      case 'removeStaff':
+        return jsonResponse_(apiRemoveStaff_(params));
       default:
         return jsonResponse_({ success: false, error: '不明なアクション: ' + params.action });
     }
@@ -665,14 +736,12 @@ function apiGeneratePDF_(params) {
   const month = params.month;
   const folder = getOrCreateFolder_(year, month);
 
-  // staffNameが空 or "all" なら全員分
   if (!params.staffName || params.staffName === 'all') {
     const staffSheets = ss.getSheets().filter(s => !SYSTEM_SHEET_NAMES.includes(s.getName()));
     const results = staffSheets.map(sheet => generateSinglePDF_(ss, sheet, year, month, folder));
     return { success: true, data: results };
   }
 
-  // 個別スタッフ
   const sheet = ss.getSheetByName(params.staffName);
   if (!sheet) {
     return { success: false, error: 'スタッフシートが見つかりません: ' + params.staffName };
@@ -711,7 +780,6 @@ function apiListPDFs_(params) {
       const file = files.next();
       const name = file.getName();
 
-      // スタッフ名フィルタ
       if (params.staffName && params.staffName !== '' && !name.includes(params.staffName)) {
         continue;
       }
@@ -727,7 +795,6 @@ function apiListPDFs_(params) {
     }
   }
 
-  // 月→ファイル名順にソート
   results.sort((a, b) => a.month - b.month || a.fileName.localeCompare(b.fileName));
   return { success: true, data: results };
 }
@@ -746,13 +813,99 @@ function apiGetPDFContent_(params) {
   };
 }
 
-// --- API: スタッフ一覧取得 ---
+// --- API: スタッフ一覧取得（定時設定付き） ---
 function apiGetStaffList_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const staffNames = ss.getSheets()
     .map(s => s.getName())
     .filter(n => !SYSTEM_SHEET_NAMES.includes(n));
-  return { success: true, data: staffNames };
+
+  const staffList = staffNames.map(name => ({
+    name: name,
+    contractedHours: getStaffSetting_(ss, name)
+  }));
+
+  return { success: true, data: staffList };
+}
+
+// --- API: スタッフ定時設定の更新 ---
+function apiSetStaffSetting_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const staffName = params.staffName;
+  const contractedHours = parseFloat(params.contractedHours);
+
+  if (!staffName) {
+    return { success: false, error: 'スタッフ名が指定されていません。' };
+  }
+  if (isNaN(contractedHours) || contractedHours < 1 || contractedHours > 24) {
+    return { success: false, error: '定時は1〜24の範囲で指定してください。' };
+  }
+
+  setStaffSetting_(ss, staffName, contractedHours);
+  return { success: true, data: { staffName: staffName, contractedHours: contractedHours } };
+}
+
+// --- API: スタッフ追加 ---
+function apiAddStaff_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const staffName = (params.staffName || '').trim();
+  const contractedHours = parseFloat(params.contractedHours) || DEFAULT_CONTRACTED_HOURS;
+
+  if (!staffName) {
+    return { success: false, error: 'スタッフ名を指定してください。' };
+  }
+
+  if (ss.getSheetByName(staffName)) {
+    return { success: false, error: 'そのスタッフは既に存在します: ' + staffName };
+  }
+
+  // 現在の年月を既存スタッフシートから取得（なければ現在月）
+  const existingSheets = ss.getSheets().filter(s => !SYSTEM_SHEET_NAMES.includes(s.getName()));
+  let year, month;
+  if (existingSheets.length > 0) {
+    year = existingSheets[0].getRange('D2').getValue();
+    month = existingSheets[0].getRange('F2').getValue();
+  } else {
+    const now = new Date();
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
+  }
+
+  createStaffSheet_(ss, staffName, year, month);
+  setStaffSetting_(ss, staffName, contractedHours);
+
+  return { success: true, data: { staffName: staffName, contractedHours: contractedHours } };
+}
+
+// --- API: スタッフ削除（シートを非表示にして保持） ---
+function apiRemoveStaff_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const staffName = (params.staffName || '').trim();
+
+  if (!staffName) {
+    return { success: false, error: 'スタッフ名を指定してください。' };
+  }
+
+  const sheet = ss.getSheetByName(staffName);
+  if (!sheet) {
+    return { success: false, error: 'スタッフシートが見つかりません: ' + staffName };
+  }
+
+  // シートを削除せず非表示にする（データ保全のため）
+  sheet.hideSheet();
+
+  // スタッフ設定から削除
+  const settingsSheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (settingsSheet && settingsSheet.getLastRow() > 1) {
+    const data = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 1).getValues();
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (data[i][0] === staffName) {
+        settingsSheet.deleteRow(i + 2);
+      }
+    }
+  }
+
+  return { success: true, data: { staffName: staffName, message: 'シートを非表示にしました（データは保持）' } };
 }
 
 // =====================================================================
@@ -772,7 +925,7 @@ function fixWeekdayFormulas() {
   ss.getSheets().forEach(sheet => {
     if (SYSTEM_SHEET_NAMES.includes(sheet.getName())) return;
     for (let i = 0; i < 31; i++) {
-      const row = i + 4;
+      const row = i + 5;
       sheet.getRange(row, 2).setFormula(
         '=IF(A' + row + '="","",CHOOSE(WEEKDAY(A' + row + '),"日","月","火","水","木","金","土"))'
       );
@@ -790,11 +943,12 @@ function showStaffHelp() {
     'スタッフ名の変更方法',
     'スタッフ名を変更するには:\n\n' +
     '1. シートのタブ名を右クリック →「名前を変更」\n' +
-    '2. シート内のA1セルも同じ名前に変更\n\n' +
+    '2. シート内のA1セルのタイトルも合わせて修正\n\n' +
     'スタッフを追加するには:\n' +
     '1. 既存のスタッフシートのタブを右クリック →「コピーを作成」\n' +
     '2. タブ名とA1セルを新しいスタッフ名に変更\n' +
-    '3. H列（備考）をクリア',
+    '3. I列（備考）をクリア\n' +
+    '4. 「スタッフ設定」シートに定時を設定',
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }

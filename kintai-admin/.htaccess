@@ -1,0 +1,23 @@
+# HTTPS強制
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# ディレクトリリスティング禁止
+Options -Indexes
+
+# config.php, auth.php, api.php への直接アクセス禁止
+<Files "config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "auth.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "api.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
