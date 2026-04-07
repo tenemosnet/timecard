@@ -47,6 +47,7 @@ function onOpen() {
     .addSeparator()
     .addItem('曜日の数式を修復', 'fixWeekdayFormulas')
     .addItem('罫線を一括適用', 'applyBordersToAll')
+    .addItem('数式を一括更新', 'updateAllFormulas')
     .addItem('スタッフ名を変更', 'showStaffHelp')
     .addToUi();
 }
@@ -405,6 +406,80 @@ function applyBordersToAll() {
   });
 
   ui.alert('完了', count + '名分のシートに罫線を適用しました。', ui.ButtonSet.OK);
+}
+
+// =====================================================================
+//  既存シートの数式を一括更新（メニューから実行）
+// =====================================================================
+function updateAllFormulas() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  const confirm = ui.alert(
+    '数式の一括更新',
+    '全スタッフシートのE〜H列（休憩・定時内・残業・深夜残業）の数式を最新に更新します。\n' +
+    '勤務日数・有給日数の欄も追加されます。\n続行しますか？',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (confirm !== ui.Button.OK) return;
+
+  const sheets = ss.getSheets();
+  let count = 0;
+
+  sheets.forEach(s => {
+    const name = s.getName();
+    if (SYSTEM_SHEET_NAMES.includes(name)) return;
+    if (s.isSheetHidden()) return;
+
+    updateSheetFormulas_(s, name);
+    count++;
+  });
+
+  ui.alert('完了', count + '名分のシートの数式を更新しました。', ui.ButtonSet.OK);
+}
+
+function updateSheetFormulas_(sheet, staffName) {
+  const log = LOG_SHEET_NAME;
+
+  // E〜H列の数式を配列で一括構築（行5〜35）
+  const formulas = [];
+  for (let i = 0; i < 31; i++) {
+    const row = i + 5;
+    formulas.push([
+      // E列: 休憩（13時前退勤なら0）
+      `=IF(AND(C${row}<>"",D${row}<>""),IF(HOUR(D${row})>=13,TIME(${BREAK_HOURS},0,0),""),"")`,
+      // F列: 定時内（土日は空）
+      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),"",MIN(D${row}-C${row}-E${row}, $I$2/24)),"")`,
+      // G列: 残業 法定内（土日は空）
+      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),"",MIN(MAX(D${row}-C${row}-E${row}-$I$2/24, 0), MAX((8-$I$2)/24, 0))),"")`,
+      // H列: 深夜残業 法定外（土日は全労働時間）
+      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),D${row}-C${row}-E${row},MAX(D${row}-C${row}-E${row}-8/24, 0)),"")`,
+    ]);
+  }
+
+  // E5:H35に一括書き込み
+  sheet.getRange(5, 5, 31, 4).setFormulas(formulas);
+
+  // フォーマット一括設定
+  sheet.getRange(5, 5, 31, 1).setNumberFormat('H:mm');
+  sheet.getRange(5, 6, 31, 1).setNumberFormat('H:mm');
+  sheet.getRange(5, 7, 31, 1).setNumberFormat('H:mm');
+  sheet.getRange(5, 8, 31, 1).setNumberFormat('H:mm');
+
+  // 行37: 勤務日数 + 注記
+  sheet.getRange('A37').setValue('勤務日数：').setFontSize(9);
+  sheet.getRange('B37').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
+  sheet.getRange('B37').setHorizontalAlignment('right').setFontWeight('bold');
+  sheet.getRange('C37').setValue('日').setFontSize(9);
+  sheet.getRange('H37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('H37:I37').merge();
+
+  // 行38: 有給日数
+  sheet.getRange('A38').setValue('有給日数：').setFontSize(9);
+  sheet.getRange('C38').setValue('日').setFontSize(9);
+
+  // 罫線も適用
+  applyBorders_(sheet);
 }
 
 // =====================================================================
