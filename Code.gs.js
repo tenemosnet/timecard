@@ -238,7 +238,7 @@ function createStaffSheet_(ss, staffName, year, month) {
   // --- 行4: 上部合計行 ---
   sheet.getRange('E4').setValue('合計').setFontWeight('bold').setHorizontalAlignment('center');
   // 合計の数式は下部合計を参照（行36）
-  sheet.getRange('F4').setFormula('=F36').setNumberFormat('[h]:mm');
+  sheet.getRange('F4').setFormula('=F37').setNumberFormat('[h]:mm');
   // 上部合計行の注記なし（1分単位合計）
   sheet.getRange('A4:I4').setBackground('#f8f9fa');
 
@@ -312,18 +312,24 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('H36').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A36:I36').setBackground('#f8f9fa');
 
-  // --- 行37: 勤務日数 + 注記 ---
-  sheet.getRange('A37').setValue('勤務日数：').setFontSize(9);
-  sheet.getRange('B37').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
-  sheet.getRange('B37').setHorizontalAlignment('right').setFontWeight('bold');
-  sheet.getRange('C37').setValue('日').setFontSize(9);
-  sheet.getRange('H37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888');
-  sheet.getRange('H37:I37').merge();
+  // --- 行37: 総合計（F+G+H の合算） ---
+  sheet.getRange('E37').setValue('総合計').setFontWeight('bold').setHorizontalAlignment('center');
+  sheet.getRange('F37').setFormula('=F36+G36+H36');
+  sheet.getRange('F37').setNumberFormat('[h]:mm').setFontWeight('bold');
+  sheet.getRange('A37:I37').setBackground('#f8f9fa');
+  // ※合計は1分単位（備考欄の下＝I37）
+  sheet.getRange('I37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888').setFontWeight('normal');
 
-  // --- 行38: 有給日数 ---
-  sheet.getRange('A38').setValue('有給日数：').setFontSize(9);
-  // B38は手入力用（空欄）
-  sheet.getRange('C38').setValue('日').setFontSize(9);
+  // --- 行42: 勤務日数（5セル下） ---
+  sheet.getRange('A42').setValue('勤務日数：').setFontSize(9);
+  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
+  sheet.getRange('B42').setHorizontalAlignment('right').setFontWeight('bold');
+  sheet.getRange('C42').setValue('日').setFontSize(9);
+
+  // --- 行43: 有給日数 ---
+  sheet.getRange('A43').setValue('有給日数：').setFontSize(9);
+  // B43は手入力用（空欄）
+  sheet.getRange('C43').setValue('日').setFontSize(9);
 
   // --- 列幅 ---
   [50, 40, 80, 80, 80, 90, 80, 90, 160].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
@@ -376,11 +382,14 @@ function applyBorders_(sheet) {
   // 下部合計行（行36）: 上線を太め + 全罫線
   sheet.getRange('A36:I36').setBorder(true, true, true, true, true, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // 外枠全体（A3:I36）を太めの枠で囲む
-  sheet.getRange('A3:I36').setBorder(true, true, true, true, null, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  // 総合計行（行37）: 罫線で囲む
+  sheet.getRange('E37:F37').setBorder(true, true, true, true, true, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // 勤務日数・有給日数の行（37-38）に下線
-  sheet.getRange('A37:C38').setBorder(null, null, true, null, null, null, thinColor, border);
+  // 外枠全体（A3:I37）を太めの枠で囲む
+  sheet.getRange('A3:I37').setBorder(true, true, true, true, null, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  // 勤務日数・有給日数の行（42-43）に下線
+  sheet.getRange('A42:C43').setBorder(null, null, true, null, null, null, thinColor, border);
 }
 
 // =====================================================================
@@ -466,17 +475,26 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange(5, 7, 31, 1).setNumberFormat('H:mm');
   sheet.getRange(5, 8, 31, 1).setNumberFormat('H:mm');
 
-  // 行37: 勤務日数 + 注記
-  sheet.getRange('A37').setValue('勤務日数：').setFontSize(9);
-  sheet.getRange('B37').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
-  sheet.getRange('B37').setHorizontalAlignment('right').setFontWeight('bold');
-  sheet.getRange('C37').setValue('日').setFontSize(9);
-  sheet.getRange('H37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888');
-  sheet.getRange('H37:I37').merge();
+  // 旧レイアウト（行37-38）をクリア
+  sheet.getRange('A37:I38').clearContent().clearFormat();
+  try { sheet.getRange('H37:I37').breakApart(); } catch(e) {}
 
-  // 行38: 有給日数
-  sheet.getRange('A38').setValue('有給日数：').setFontSize(9);
-  sheet.getRange('C38').setValue('日').setFontSize(9);
+  // 行37: 総合計（F+G+H合算）
+  sheet.getRange('E37').setValue('総合計').setFontWeight('bold').setHorizontalAlignment('center');
+  sheet.getRange('F37').setFormula('=F36+G36+H36');
+  sheet.getRange('F37').setNumberFormat('[h]:mm').setFontWeight('bold');
+  sheet.getRange('A37:I37').setBackground('#f8f9fa');
+  sheet.getRange('I37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888').setFontWeight('normal');
+
+  // 行42: 勤務日数
+  sheet.getRange('A42').setValue('勤務日数：').setFontSize(9);
+  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
+  sheet.getRange('B42').setHorizontalAlignment('right').setFontWeight('bold');
+  sheet.getRange('C42').setValue('日').setFontSize(9);
+
+  // 行43: 有給日数
+  sheet.getRange('A43').setValue('有給日数：').setFontSize(9);
+  sheet.getRange('C43').setValue('日').setFontSize(9);
 
   // 罫線も適用
   applyBorders_(sheet);
@@ -764,7 +782,7 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
     '&sheetnames=false' +
     '&pagenum=UNDEFINED' +
     '&fzr=true' +
-    '&range=A1:I38';
+    '&range=A1:I43';
 
   const response = UrlFetchApp.fetch(url, {
     headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
