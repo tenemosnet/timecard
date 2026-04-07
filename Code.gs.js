@@ -657,6 +657,32 @@ function updateSheetFormulas_(sheet, staffName) {
 
   // 罫線も適用
   applyBorders_(sheet);
+
+  // 条件付き書式を更新（土日 + 祝日）
+  const dataRange = sheet.getRange('A5:I35');
+
+  const sundayRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=AND($A5<>"",WEEKDAY($A5)=1)')
+    .setFontColor('#dc2626')
+    .setBackground('#ffe0e0')
+    .setRanges([dataRange])
+    .build();
+
+  const saturdayRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=AND($A5<>"",WEEKDAY($A5)=7)')
+    .setFontColor('#2563eb')
+    .setBackground('#e0f0ff')
+    .setRanges([dataRange])
+    .build();
+
+  const holidayRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=AND($A5<>"",COUNTIF('${HOLIDAYS_SHEET_NAME}'!$A:$A,$A5)>0)`)
+    .setFontColor('#dc2626')
+    .setBackground('#ffe0e0')
+    .setRanges([dataRange])
+    .build();
+
+  sheet.setConditionalFormatRules([sundayRule, saturdayRule, holidayRule]);
 }
 
 // =====================================================================
