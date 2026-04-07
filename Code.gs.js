@@ -775,16 +775,15 @@ function promptNewMonth() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  const yearRes = ui.prompt('新しい月へ移行', '年を入力してください（例: 2026）', ui.ButtonSet.OK_CANCEL);
-  if (yearRes.getSelectedButton() !== ui.Button.OK) return;
-  const year = parseInt(yearRes.getResponseText());
+  const res = ui.prompt('新しい月へ移行', '年/月を入力してください（例: 2026/5）', ui.ButtonSet.OK_CANCEL);
+  if (res.getSelectedButton() !== ui.Button.OK) return;
 
-  const monthRes = ui.prompt('新しい月へ移行', '月を入力してください（例: 5）', ui.ButtonSet.OK_CANCEL);
-  if (monthRes.getSelectedButton() !== ui.Button.OK) return;
-  const month = parseInt(monthRes.getResponseText());
+  const parts = res.getResponseText().split('/');
+  const year = parseInt(parts[0]);
+  const month = parseInt(parts[1]);
 
-  if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-    ui.alert('エラー', '有効な年・月を入力してください。', ui.ButtonSet.OK);
+  if (parts.length !== 2 || isNaN(year) || isNaN(month) || month < 1 || month > 12 || year < 2020) {
+    ui.alert('エラー', '「年/月」の形式で入力してください。\n例: 2026/5', ui.ButtonSet.OK);
     return;
   }
 
