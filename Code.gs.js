@@ -286,15 +286,29 @@ function createStaffSheet_(ss, staffName, year, month) {
     );
     sheet.getRange(row, 6).setNumberFormat('H:mm');
 
-    // G列: 残業時間 = 定時超〜8h以内の法定内残業（土日は0）
+    // G列: 残業時間
+    // 7.5h定時: 定時超〜8h（法定内残業）、8h定時: 8h超で22時前まで（通常残業）
+    // 土日は0
     sheet.getRange(row, 7).setFormula(
-      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),"",MIN(MAX(D${row}-C${row}-E${row}-$I$2/24, 0), MAX((8-$I$2)/24, 0))),"")`
+      `=IF(AND(C${row}<>"",D${row}<>""),` +
+      `IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),"",` +
+      `IF($I$2<8,` +
+      `MIN(MAX(D${row}-C${row}-E${row}-$I$2/24,0),(8-$I$2)/24),` +
+      `MAX(MAX(D${row}-C${row}-E${row}-$I$2/24,0)-MIN(IF(HOUR(D${row})>=22,MOD(D${row},1)-TIME(22,0,0),0),MAX(D${row}-C${row}-E${row}-$I$2/24,0)),0)` +
+      `)),"")`
     );
     sheet.getRange(row, 7).setNumberFormat('H:mm');
 
-    // H列: 深夜残業時間 = 平日は8h超の法定外残業、土日は全労働時間（休日残業）
+    // H列: 深夜残業時間
+    // 7.5h定時: 8h超（法定外残業）、8h定時: 22時以降の勤務
+    // 土日は全労働時間（休日残業）
     sheet.getRange(row, 8).setFormula(
-      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),D${row}-C${row}-E${row},MAX(D${row}-C${row}-E${row}-8/24, 0)),"")`
+      `=IF(AND(C${row}<>"",D${row}<>""),` +
+      `IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),D${row}-C${row}-E${row},` +
+      `IF($I$2<8,` +
+      `MAX(D${row}-C${row}-E${row}-8/24,0),` +
+      `MIN(IF(HOUR(D${row})>=22,MOD(D${row},1)-TIME(22,0,0),0),MAX(D${row}-C${row}-E${row}-$I$2/24,0))` +
+      `)),"")`
     );
     sheet.getRange(row, 8).setNumberFormat('H:mm');
 
@@ -322,7 +336,7 @@ function createStaffSheet_(ss, staffName, year, month) {
 
   // --- 行42: 勤務日数（5セル下） ---
   sheet.getRange('A42').setValue('勤務日数：').setFontSize(9);
-  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
+  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,">0",D5:D35,">0")');
   sheet.getRange('B42').setHorizontalAlignment('right').setFontWeight('bold');
   sheet.getRange('C42').setValue('日').setFontSize(9);
 
@@ -459,10 +473,10 @@ function updateSheetFormulas_(sheet, staffName) {
       `=IF(AND(C${row}<>"",D${row}<>""),IF(HOUR(D${row})>=13,TIME(${BREAK_HOURS},0,0),""),"")`,
       // F列: 定時内（土日は空）
       `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),"",MIN(D${row}-C${row}-E${row}, $I$2/24)),"")`,
-      // G列: 残業 法定内（土日は空）
-      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),"",MIN(MAX(D${row}-C${row}-E${row}-$I$2/24, 0), MAX((8-$I$2)/24, 0))),"")`,
-      // H列: 深夜残業 法定外（土日は全労働時間）
-      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),D${row}-C${row}-E${row},MAX(D${row}-C${row}-E${row}-8/24, 0)),"")`,
+      // G列: 残業（7.5h:法定内、8h:22時前の通常残業、土日は空）
+      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),"",IF($I$2<8,MIN(MAX(D${row}-C${row}-E${row}-$I$2/24,0),(8-$I$2)/24),MAX(MAX(D${row}-C${row}-E${row}-$I$2/24,0)-MIN(IF(HOUR(D${row})>=22,MOD(D${row},1)-TIME(22,0,0),0),MAX(D${row}-C${row}-E${row}-$I$2/24,0)),0))),"")`,
+      // H列: 深夜残業（7.5h:8h超法定外、8h:22時以降、土日は全労働時間）
+      `=IF(AND(C${row}<>"",D${row}<>""),IF(OR(WEEKDAY(A${row})=1,WEEKDAY(A${row})=7),D${row}-C${row}-E${row},IF($I$2<8,MAX(D${row}-C${row}-E${row}-8/24,0),MIN(IF(HOUR(D${row})>=22,MOD(D${row},1)-TIME(22,0,0),0),MAX(D${row}-C${row}-E${row}-$I$2/24,0)))),"")`,
     ]);
   }
 
@@ -488,7 +502,7 @@ function updateSheetFormulas_(sheet, staffName) {
 
   // 行42: 勤務日数
   sheet.getRange('A42').setValue('勤務日数：').setFontSize(9);
-  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
+  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,">0",D5:D35,">0")');
   sheet.getRange('B42').setHorizontalAlignment('right').setFontWeight('bold');
   sheet.getRange('C42').setValue('日').setFontSize(9);
 
