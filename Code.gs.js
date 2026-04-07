@@ -286,19 +286,16 @@ function createStaffSheet_(ss, staffName, year, month) {
     );
     sheet.getRange(row, 6).setNumberFormat('H:mm');
 
-    // G列: 残業時間 = MAX(実働 - 定時, 0)
+    // G列: 残業時間 = 定時超〜8h以内の法定内残業
+    // MIN(全残業, 8h-定時) → 定時7.5hなら最大0:30、定時8hなら0
     sheet.getRange(row, 7).setFormula(
-      `=IF(AND(C${row}<>"",D${row}<>""),MAX(D${row}-C${row}-E${row}-$I$2/24, 0),"")`
+      `=IF(AND(C${row}<>"",D${row}<>""),MIN(MAX(D${row}-C${row}-E${row}-$I$2/24, 0), MAX((8-$I$2)/24, 0)),"")`
     );
     sheet.getRange(row, 7).setNumberFormat('H:mm');
 
-    // H列: 深夜残業時間（22:00〜5:00の勤務時間）
-    // 終了時間が22:00を超えた場合: MIN(終了,翌5:00) - MAX(開始,22:00)
+    // H列: 深夜残業時間 = 8h超の法定外残業
     sheet.getRange(row, 8).setFormula(
-      `=IF(AND(C${row}<>"",D${row}<>""),` +
-      `IF(HOUR(D${row})>=22,(D${row}-TIME(22,0,0)),` +
-      `IF(AND(HOUR(D${row})<5,D${row}<C${row}),(TIME(5,0,0)-TIME(0,0,0))-(TIME(22,0,0)-D${row}),` +
-      `0)),"")`
+      `=IF(AND(C${row}<>"",D${row}<>""),MAX(D${row}-C${row}-E${row}-8/24, 0),"")`
     );
     sheet.getRange(row, 8).setNumberFormat('H:mm');
 
