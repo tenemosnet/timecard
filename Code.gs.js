@@ -273,9 +273,9 @@ function createStaffSheet_(ss, staffName, year, month) {
     );
     sheet.getRange(row, 4).setNumberFormat('H:mm');
 
-    // E列: 休憩時間（出退勤があれば固定1時間）
+    // E列: 休憩時間（13時以降の退勤なら1時間、13時前なら0）
     sheet.getRange(row, 5).setFormula(
-      `=IF(AND(C${row}<>"",D${row}<>""),TIME(${BREAK_HOURS},0,0),"")`
+      `=IF(AND(C${row}<>"",D${row}<>""),IF(HOUR(D${row})>=13,TIME(${BREAK_HOURS},0,0),""),"")`
     );
     sheet.getRange(row, 5).setNumberFormat('H:mm');
 
@@ -312,6 +312,19 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('H36').setFormula('=SUMPRODUCT((H5:H35<>"")*H5:H35)');
   sheet.getRange('H36').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A36:I36').setBackground('#f8f9fa');
+
+  // --- 行37: 勤務日数 + 注記 ---
+  sheet.getRange('A37').setValue('勤務日数：').setFontSize(9);
+  sheet.getRange('B37').setFormula('=COUNTIFS(C5:C35,"<>",D5:D35,"<>")');
+  sheet.getRange('B37').setHorizontalAlignment('right').setFontWeight('bold');
+  sheet.getRange('C37').setValue('日').setFontSize(9);
+  sheet.getRange('H37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('H37:I37').merge();
+
+  // --- 行38: 有給日数 ---
+  sheet.getRange('A38').setValue('有給日数：').setFontSize(9);
+  // B38は手入力用（空欄）
+  sheet.getRange('C38').setValue('日').setFontSize(9);
 
   // --- 列幅 ---
   [50, 40, 80, 80, 80, 90, 80, 90, 160].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
@@ -366,6 +379,9 @@ function applyBorders_(sheet) {
 
   // 外枠全体（A3:I36）を太めの枠で囲む
   sheet.getRange('A3:I36').setBorder(true, true, true, true, null, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  // 勤務日数・有給日数の行（37-38）に下線
+  sheet.getRange('A37:C38').setBorder(null, null, true, null, null, null, thinColor, border);
 }
 
 // =====================================================================
@@ -675,7 +691,7 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
     '&sheetnames=false' +
     '&pagenum=UNDEFINED' +
     '&fzr=true' +
-    '&range=A1:I36';
+    '&range=A1:I38';
 
   const response = UrlFetchApp.fetch(url, {
     headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
