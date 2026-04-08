@@ -466,19 +466,38 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('F37').setFormula('=F36+G36+H36');
   sheet.getRange('F37').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A37:I37').setBackground('#f8f9fa');
-  // ※合計は1分単位（備考欄の下＝I37）
   sheet.getRange('I37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888').setFontWeight('normal');
 
-  // --- 行42: 勤務日数（5セル下） ---
-  sheet.getRange('A42').setValue('勤務日数：').setFontSize(9);
-  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,">0",D5:D35,">0")');
-  sheet.getRange('B42').setHorizontalAlignment('right').setFontWeight('bold');
-  sheet.getRange('C42').setValue('日').setFontSize(9);
+  // --- 行39: 給与計算用（10進法変換） ---
+  sheet.getRange('E39').setValue('給与計算用').setFontWeight('bold').setHorizontalAlignment('center').setFontSize(9);
+  sheet.getRange('F39').setFormula('=TRUNC(HOUR(F36)+MINUTE(F36)/60,2)');
+  sheet.getRange('F39').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('G39').setFormula('=TRUNC(HOUR(G36)+MINUTE(G36)/60,2)');
+  sheet.getRange('G39').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('H39').setFormula('=TRUNC(HOUR(H36)+MINUTE(H36)/60,2)');
+  sheet.getRange('H39').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('A39:I39').setBackground('#f8f9fa');
 
-  // --- 行43: 有給日数 ---
-  sheet.getRange('A43').setValue('有給日数：').setFontSize(9);
-  // B43は手入力用（空欄）
+  // --- 行40: 給与計算用 総合計 ---
+  sheet.getRange('E40').setValue('（10進法）').setFontSize(8).setHorizontalAlignment('center').setFontColor('#888888');
+  sheet.getRange('F40').setFormula('=F39+G39+H39');
+  sheet.getRange('F40').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('A40:I40').setBackground('#f8f9fa');
+
+  // --- 行41: 計算式の説明 ---
+  sheet.getRange('E41').setValue('計算式: 時間×60＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E41:I41').merge();
+
+  // --- 行43: 勤務日数 ---
+  sheet.getRange('A43').setValue('勤務日数：').setFontSize(9);
+  sheet.getRange('B43').setFormula('=COUNTIFS(C5:C35,">0",D5:D35,">0")');
+  sheet.getRange('B43').setHorizontalAlignment('right').setFontWeight('bold');
   sheet.getRange('C43').setValue('日').setFontSize(9);
+
+  // --- 行44: 有給日数 ---
+  sheet.getRange('A44').setValue('有給日数：').setFontSize(9);
+  // B44は手入力用（空欄）
+  sheet.getRange('C44').setValue('日').setFontSize(9);
 
   // --- 列幅 ---
   [50, 40, 80, 80, 80, 90, 80, 90, 160].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
@@ -544,8 +563,12 @@ function applyBorders_(sheet) {
   // 外枠全体（A3:I37）を太めの枠で囲む
   sheet.getRange('A3:I37').setBorder(true, true, true, true, null, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // 勤務日数・有給日数の行（42-43）に下線
-  sheet.getRange('A42:C43').setBorder(null, null, true, null, null, null, thinColor, border);
+  // 給与計算用（行39-40）: 罫線で囲む
+  sheet.getRange('E39:H39').setBorder(true, true, true, true, true, null, thinColor, border);
+  sheet.getRange('E40:F40').setBorder(true, true, true, true, true, null, thinColor, border);
+
+  // 勤務日数・有給日数の行（43-44）に下線
+  sheet.getRange('A43:C44').setBorder(null, null, true, null, null, null, thinColor, border);
 }
 
 // =====================================================================
@@ -634,9 +657,10 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange(5, 7, 31, 1).setNumberFormat('H:mm');
   sheet.getRange(5, 8, 31, 1).setNumberFormat('H:mm');
 
-  // 旧レイアウト（行37-38）をクリア
-  sheet.getRange('A37:I38').clearContent().clearFormat();
+  // 旧レイアウト（行37〜44）をクリア
+  sheet.getRange('A37:I44').clearContent().clearFormat();
   try { sheet.getRange('H37:I37').breakApart(); } catch(e) {}
+  try { sheet.getRange('E41:I41').breakApart(); } catch(e) {}
 
   // 行37: 総合計（F+G+H合算）
   sheet.getRange('E37').setValue('総合計').setFontWeight('bold').setHorizontalAlignment('center');
@@ -645,15 +669,35 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange('A37:I37').setBackground('#f8f9fa');
   sheet.getRange('I37').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888').setFontWeight('normal');
 
-  // 行42: 勤務日数
-  sheet.getRange('A42').setValue('勤務日数：').setFontSize(9);
-  sheet.getRange('B42').setFormula('=COUNTIFS(C5:C35,">0",D5:D35,">0")');
-  sheet.getRange('B42').setHorizontalAlignment('right').setFontWeight('bold');
-  sheet.getRange('C42').setValue('日').setFontSize(9);
+  // 行39: 給与計算用（10進法変換）
+  sheet.getRange('E39').setValue('給与計算用').setFontWeight('bold').setHorizontalAlignment('center').setFontSize(9);
+  sheet.getRange('F39').setFormula('=TRUNC(HOUR(F36)+MINUTE(F36)/60,2)');
+  sheet.getRange('F39').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('G39').setFormula('=TRUNC(HOUR(G36)+MINUTE(G36)/60,2)');
+  sheet.getRange('G39').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('H39').setFormula('=TRUNC(HOUR(H36)+MINUTE(H36)/60,2)');
+  sheet.getRange('H39').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('A39:I39').setBackground('#f8f9fa');
 
-  // 行43: 有給日数
-  sheet.getRange('A43').setValue('有給日数：').setFontSize(9);
+  // 行40: 給与計算用 総合計
+  sheet.getRange('E40').setValue('（10進法）').setFontSize(8).setHorizontalAlignment('center').setFontColor('#888888');
+  sheet.getRange('F40').setFormula('=F39+G39+H39');
+  sheet.getRange('F40').setNumberFormat('0.00').setFontWeight('bold');
+  sheet.getRange('A40:I40').setBackground('#f8f9fa');
+
+  // 行41: 計算式の説明
+  sheet.getRange('E41').setValue('計算式: 時間×60＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E41:I41').merge();
+
+  // 行43: 勤務日数
+  sheet.getRange('A43').setValue('勤務日数：').setFontSize(9);
+  sheet.getRange('B43').setFormula('=COUNTIFS(C5:C35,">0",D5:D35,">0")');
+  sheet.getRange('B43').setHorizontalAlignment('right').setFontWeight('bold');
   sheet.getRange('C43').setValue('日').setFontSize(9);
+
+  // 行44: 有給日数
+  sheet.getRange('A44').setValue('有給日数：').setFontSize(9);
+  sheet.getRange('C44').setValue('日').setFontSize(9);
 
   // 罫線も適用
   applyBorders_(sheet);
@@ -966,7 +1010,7 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
     '&sheetnames=false' +
     '&pagenum=UNDEFINED' +
     '&fzr=true' +
-    '&range=A1:I43';
+    '&range=A1:I44';
 
   const response = UrlFetchApp.fetch(url, {
     headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
