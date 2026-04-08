@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.14
+ *  勤怠管理システム — Google Apps Script  ver1.15
  * ====================================
  *
  *  セットアップ手順:
@@ -201,6 +201,13 @@ function createHolidaysSheet_(ss) {
 // =====================================================================
 //  祝日取得（Google Calendar API）
 // =====================================================================
+// Google Calendarに含まれるが国民の祝日ではないイベント
+const NON_OFFICIAL_HOLIDAYS = [
+  'ひな祭り', '七五三', 'クリスマス', 'バレンタインデー',
+  'ホワイトデー', 'ハロウィン', '大晦日', '節分',
+  '母の日', '父の日', 'クリスマス イブ'
+];
+
 function fetchHolidays_(year) {
   const cal = CalendarApp.getCalendarById(HOLIDAY_CALENDAR_ID);
   if (!cal) throw new Error('日本の祝日カレンダーにアクセスできません。');
@@ -209,10 +216,12 @@ function fetchHolidays_(year) {
   const end = new Date(year, 11, 31, 23, 59, 59); // 12/31
   const events = cal.getEvents(start, end);
 
-  return events.map(ev => ({
-    date: ev.getAllDayStartDate(),
-    name: ev.getTitle()
-  }));
+  return events
+    .filter(ev => !NON_OFFICIAL_HOLIDAYS.includes(ev.getTitle()))
+    .map(ev => ({
+      date: ev.getAllDayStartDate(),
+      name: ev.getTitle()
+    }));
 }
 
 // =====================================================================
@@ -449,9 +458,9 @@ function createStaffSheet_(ss, staffName, year, month) {
 
     // I列: 備考（手動入力用）
 
-    // J列: 祝日フラグ（条件付き書式用ヘルパー、非表示列）
+    // J列: 祝日名（条件付き書式・備考用ヘルパー、非表示列）
     sheet.getRange(row, 10).setFormula(
-      `=IF(AND(A${row}<>"",COUNTIF('${HOLIDAYS_SHEET_NAME}'!$A:$A,A${row})>0),1,"")`
+      `=IFERROR(INDEX('${HOLIDAYS_SHEET_NAME}'!$B:$B,MATCH(A${row},'${HOLIDAYS_SHEET_NAME}'!$A:$A,0)),"")`
     );
   }
 
@@ -531,7 +540,7 @@ function createStaffSheet_(ss, staffName, year, month) {
     .build();
 
   const holidayRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A5<>"",$J5=1)')
+    .whenFormulaSatisfied('=AND($A5<>"",$J5<>"")')
     .setFontColor('#dc2626')
     .setBackground('#ffe0e0')
     .setRanges([dataRange])
@@ -542,7 +551,32 @@ function createStaffSheet_(ss, staffName, year, month) {
   // ヘッダー固定
   sheet.setFrozenRows(4);
 
+  // 備考欄に祝日名を記入
+  fillHolidayNames_(sheet);
+
   return sheet;
+}
+
+// =====================================================================
+//  備考欄に祝日名を自動記入（空セルのみ）
+// =====================================================================
+function fillHolidayNames_(sheet) {
+  SpreadsheetApp.flush(); // J列の数式を確定
+  const jValues = sheet.getRange('J5:J35').getValues();  // 祝日名
+  const iValues = sheet.getRange('I5:I35').getValues();  // 現在の備考
+
+  let updated = false;
+  for (let i = 0; i < 31; i++) {
+    const holidayName = jValues[i][0];
+    const currentNote = iValues[i][0];
+    if (holidayName && (!currentNote || currentNote === '')) {
+      iValues[i][0] = holidayName;
+      updated = true;
+    }
+  }
+  if (updated) {
+    sheet.getRange('I5:I35').setValues(iValues);
+  }
 }
 
 // =====================================================================
@@ -659,11 +693,11 @@ function updateSheetFormulas_(sheet, staffName) {
   // E5:H35に一括書き込み
   sheet.getRange(5, 5, 31, 4).setFormulas(formulas);
 
-  // J列: 祝日フラグ（条件付き書式用ヘルパー）
+  // J列: 祝日名（条件付き書式・備考用ヘルパー）
   const jFormulas = [];
   for (let i = 0; i < 31; i++) {
     const row = i + 5;
-    jFormulas.push([`=IF(AND(A${row}<>"",COUNTIF('${hol}'!$A:$A,A${row})>0),1,"")`]);
+    jFormulas.push([`=IFERROR(INDEX('${hol}'!$B:$B,MATCH(A${row},'${hol}'!$A:$A,0)),"")`]);
   }
   sheet.getRange(5, 10, 31, 1).setFormulas(jFormulas);
   sheet.hideColumns(10);
@@ -719,6 +753,9 @@ function updateSheetFormulas_(sheet, staffName) {
   // 罫線も適用
   applyBorders_(sheet);
 
+  // 備考欄に祝日名を記入（空セルのみ）
+  fillHolidayNames_(sheet);
+
   // 条件付き書式を更新（土日 + 祝日）
   const dataRange = sheet.getRange('A5:I35');
 
@@ -737,7 +774,7 @@ function updateSheetFormulas_(sheet, staffName) {
     .build();
 
   const holidayRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A5<>"",$J5=1)')
+    .whenFormulaSatisfied('=AND($A5<>"",$J5<>"")')
     .setFontColor('#dc2626')
     .setBackground('#ffe0e0')
     .setRanges([dataRange])
@@ -894,6 +931,9 @@ function promptNewMonth() {
     sheet.getRange('D2').setValue(year);
     sheet.getRange('F2').setValue(month);
     sheet.getRange('I5:I35').clearContent();
+
+    // 備考欄に祝日名を記入
+    fillHolidayNames_(sheet);
   });
 
   ui.alert('完了', '全スタッフのシートを ' + year + '年' + month + '月に更新しました。\n' +
