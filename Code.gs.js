@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.13
+ *  勤怠管理システム — Google Apps Script  ver1.14
  * ====================================
  *
  *  セットアップ手順:
@@ -478,11 +478,11 @@ function createStaffSheet_(ss, staffName, year, month) {
 
   // --- 行39: 給与計算用（10進法変換） ---
   sheet.getRange('E39').setValue('給与計算用').setFontWeight('bold').setHorizontalAlignment('center').setFontSize(9);
-  sheet.getRange('F39').setFormula('=TRUNC(HOUR(F36)+MINUTE(F36)/60,2)');
+  sheet.getRange('F39').setFormula('=TRUNC(F36*24,2)');
   sheet.getRange('F39').setNumberFormat('0.00').setFontWeight('bold');
-  sheet.getRange('G39').setFormula('=TRUNC(HOUR(G36)+MINUTE(G36)/60,2)');
+  sheet.getRange('G39').setFormula('=TRUNC(G36*24,2)');
   sheet.getRange('G39').setNumberFormat('0.00').setFontWeight('bold');
-  sheet.getRange('H39').setFormula('=TRUNC(HOUR(H36)+MINUTE(H36)/60,2)');
+  sheet.getRange('H39').setFormula('=TRUNC(H36*24,2)');
   sheet.getRange('H39').setNumberFormat('0.00').setFontWeight('bold');
   sheet.getRange('A39:I39').setBackground('#f8f9fa');
 
@@ -493,7 +493,7 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('A40:I40').setBackground('#f8f9fa');
 
   // --- 行41: 計算式の説明 ---
-  sheet.getRange('E41').setValue('計算式: 時間×60＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E41').setValue('計算式: 合計時間×24  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
   sheet.getRange('E41:I41').merge();
 
   // --- 行43: 勤務日数 ---
@@ -688,11 +688,11 @@ function updateSheetFormulas_(sheet, staffName) {
 
   // 行39: 給与計算用（10進法変換）
   sheet.getRange('E39').setValue('給与計算用').setFontWeight('bold').setHorizontalAlignment('center').setFontSize(9);
-  sheet.getRange('F39').setFormula('=TRUNC(HOUR(F36)+MINUTE(F36)/60,2)');
+  sheet.getRange('F39').setFormula('=TRUNC(F36*24,2)');
   sheet.getRange('F39').setNumberFormat('0.00').setFontWeight('bold');
-  sheet.getRange('G39').setFormula('=TRUNC(HOUR(G36)+MINUTE(G36)/60,2)');
+  sheet.getRange('G39').setFormula('=TRUNC(G36*24,2)');
   sheet.getRange('G39').setNumberFormat('0.00').setFontWeight('bold');
-  sheet.getRange('H39').setFormula('=TRUNC(HOUR(H36)+MINUTE(H36)/60,2)');
+  sheet.getRange('H39').setFormula('=TRUNC(H36*24,2)');
   sheet.getRange('H39').setNumberFormat('0.00').setFontWeight('bold');
   sheet.getRange('A39:I39').setBackground('#f8f9fa');
 
@@ -703,7 +703,7 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange('A40:I40').setBackground('#f8f9fa');
 
   // 行41: 計算式の説明
-  sheet.getRange('E41').setValue('計算式: 時間×60＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E41').setValue('計算式: 合計時間×24  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
   sheet.getRange('E41:I41').merge();
 
   // 行43: 勤務日数
