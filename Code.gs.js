@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.19
+ *  勤怠管理システム — Google Apps Script  ver1.20
  * ====================================
  *
  *  セットアップ手順:
@@ -43,7 +43,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('勤怠管理')
     .addItem('初期設定（初回のみ）', 'initialize')
     .addSeparator()
-    .addItem('新しい月へ移行', 'promptNewMonth')
+    .addItem('月を移行', 'promptNewMonth')
     .addItem('PDF出力（月次）', 'exportPdf')
     .addItem('備考を復元', 'restoreNotes')
     .addSeparator()
@@ -360,10 +360,10 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('A1:I1').merge();
 
   // --- 行2: 年月・定時設定 ---
-  sheet.getRange('C2').setValue('年：');
-  sheet.getRange('D2').setValue(year).setFontWeight('bold');
-  sheet.getRange('E2').setValue('月：');
-  sheet.getRange('F2').setValue(month).setFontWeight('bold');
+  sheet.getRange('B2').setValue(year).setFontWeight('bold');
+  sheet.getRange('C2').setValue('年');
+  sheet.getRange('D2').setValue(month).setFontWeight('bold');
+  sheet.getRange('E2').setValue('月');
   sheet.getRange('H2').setValue('定時：');
   sheet.getRange('I2').setFormula(
     `=IFERROR(INDEX(FILTER('${SETTINGS_SHEET_NAME}'!B:B,'${SETTINGS_SHEET_NAME}'!A:A="${staffName}"),1),${DEFAULT_CONTRACTED_HOURS})`
@@ -392,7 +392,7 @@ function createStaffSheet_(ss, staffName, year, month) {
     // 前月16日からの日付を計算: DATE(year, month-1, 16+dayOffset)
     // 月の最終日（翌月15日）を超えたら空白
     sheet.getRange(row, 1).setFormula(
-      `=LET(startDate,DATE(D2,F2-1,16),d,startDate+${dayOffset},endDate,DATE(D2,F2,${CUTOFF_DAY}),IF(d<=endDate,d,""))`
+      `=LET(startDate,DATE(B2,D2-1,16),d,startDate+${dayOffset},endDate,DATE(B2,D2,${CUTOFF_DAY}),IF(d<=endDate,d,""))`
     );
     // 日付表示: 月が変わったら "m/d"、同じ月なら "d" のみ
     // → カスタム表示は数式で制御（表示用にTEXTで整形）
@@ -952,13 +952,13 @@ function getStaffWithStatus() {
 }
 
 // =====================================================================
-//  新しい月へ移行
+//  月を移行
 // =====================================================================
 function promptNewMonth() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  const res = ui.prompt('新しい月へ移行', '年/月を入力してください（例: 2026/5）', ui.ButtonSet.OK_CANCEL);
+  const res = ui.prompt('月を移行', '年/月を入力してください（例: 2026/5）', ui.ButtonSet.OK_CANCEL);
   if (res.getSelectedButton() !== ui.Button.OK) return;
 
   const parts = res.getResponseText().split('/');
@@ -989,8 +989,8 @@ function promptNewMonth() {
     const name = sheet.getName();
     if (SYSTEM_SHEET_NAMES.includes(name)) return;
 
-    const curYear = sheet.getRange('D2').getValue();
-    const curMonth = sheet.getRange('F2').getValue();
+    const curYear = sheet.getRange('B2').getValue();
+    const curMonth = sheet.getRange('D2').getValue();
 
     // 備考欄（I列）をバックアップ
     const notes = sheet.getRange('I5:I35').getValues();
@@ -1013,8 +1013,8 @@ function promptNewMonth() {
     }
 
     // 年月更新＆備考クリア
-    sheet.getRange('D2').setValue(year);
-    sheet.getRange('F2').setValue(month);
+    sheet.getRange('B2').setValue(year);
+    sheet.getRange('D2').setValue(month);
     sheet.getRange('I5:I35').clearContent();
 
     // 備考欄に祝日名を記入
@@ -1043,8 +1043,8 @@ function restoreNotes() {
   );
   if (staffSheets.length === 0) return;
 
-  const year = staffSheets[0].getRange('D2').getValue();
-  const month = staffSheets[0].getRange('F2').getValue();
+  const year = staffSheets[0].getRange('B2').getValue();
+  const month = staffSheets[0].getRange('D2').getValue();
 
   const confirm = ui.alert(
     '備考を復元',
@@ -1120,14 +1120,14 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   const monthStr = String(month).padStart(2, '0');
   const fileName = staffName + '_' + year + '年' + monthStr + '月_勤怠表.pdf';
 
-  // シートのD2/F2が指定年月と異なる場合、一時変更
-  const origYear = sheet.getRange('D2').getValue();
-  const origMonth = sheet.getRange('F2').getValue();
+  // シートのB2/D2が指定年月と異なる場合、一時変更
+  const origYear = sheet.getRange('B2').getValue();
+  const origMonth = sheet.getRange('D2').getValue();
   const needRestore = (origYear != year || origMonth != month);
 
   if (needRestore) {
-    sheet.getRange('D2').setValue(year);
-    sheet.getRange('F2').setValue(month);
+    sheet.getRange('B2').setValue(year);
+    sheet.getRange('D2').setValue(month);
     SpreadsheetApp.flush();
   }
 
@@ -1162,8 +1162,8 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   const file = folder.createFile(blob);
 
   if (needRestore) {
-    sheet.getRange('D2').setValue(origYear);
-    sheet.getRange('F2').setValue(origMonth);
+    sheet.getRange('B2').setValue(origYear);
+    sheet.getRange('D2').setValue(origMonth);
     SpreadsheetApp.flush();
   }
 
@@ -1190,8 +1190,8 @@ function exportPdf() {
     return;
   }
 
-  const year = staffSheets[0].getRange('D2').getValue();
-  const month = staffSheets[0].getRange('F2').getValue();
+  const year = staffSheets[0].getRange('B2').getValue();
+  const month = staffSheets[0].getRange('D2').getValue();
   const staffNames = staffSheets.map(s => s.getName()).join('、');
 
   const confirm = ui.alert(
@@ -1421,8 +1421,8 @@ function apiAddStaff_(params) {
   const existingSheets = ss.getSheets().filter(s => !SYSTEM_SHEET_NAMES.includes(s.getName()));
   let year, month;
   if (existingSheets.length > 0) {
-    year = existingSheets[0].getRange('D2').getValue();
-    month = existingSheets[0].getRange('F2').getValue();
+    year = existingSheets[0].getRange('B2').getValue();
+    month = existingSheets[0].getRange('D2').getValue();
   } else {
     const now = new Date();
     year = now.getFullYear();
