@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.12
+ *  勤怠管理システム — Google Apps Script  ver1.13
  * ====================================
  *
  *  セットアップ手順:
@@ -448,7 +448,15 @@ function createStaffSheet_(ss, staffName, year, month) {
     sheet.getRange(row, 8).setNumberFormat('H:mm');
 
     // I列: 備考（手動入力用）
+
+    // J列: 祝日フラグ（条件付き書式用ヘルパー、非表示列）
+    sheet.getRange(row, 10).setFormula(
+      `=IF(AND(A${row}<>"",COUNTIF('${HOLIDAYS_SHEET_NAME}'!$A:$A,A${row})>0),1,"")`
+    );
   }
+
+  // J列を非表示
+  sheet.hideColumns(10);
 
   // --- 行36: 下部合計行 ---
   sheet.getRange('E36').setValue('合計').setFontWeight('bold').setHorizontalAlignment('center');
@@ -523,7 +531,7 @@ function createStaffSheet_(ss, staffName, year, month) {
     .build();
 
   const holidayRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied(`=AND($A5<>"",COUNTIF('${HOLIDAYS_SHEET_NAME}'!$A:$A,$A5)>0)`)
+    .whenFormulaSatisfied('=AND($A5<>"",$J5=1)')
     .setFontColor('#dc2626')
     .setBackground('#ffe0e0')
     .setRanges([dataRange])
@@ -651,6 +659,15 @@ function updateSheetFormulas_(sheet, staffName) {
   // E5:H35に一括書き込み
   sheet.getRange(5, 5, 31, 4).setFormulas(formulas);
 
+  // J列: 祝日フラグ（条件付き書式用ヘルパー）
+  const jFormulas = [];
+  for (let i = 0; i < 31; i++) {
+    const row = i + 5;
+    jFormulas.push([`=IF(AND(A${row}<>"",COUNTIF('${hol}'!$A:$A,A${row})>0),1,"")`]);
+  }
+  sheet.getRange(5, 10, 31, 1).setFormulas(jFormulas);
+  sheet.hideColumns(10);
+
   // フォーマット一括設定
   sheet.getRange(5, 5, 31, 1).setNumberFormat('H:mm');
   sheet.getRange(5, 6, 31, 1).setNumberFormat('H:mm');
@@ -720,7 +737,7 @@ function updateSheetFormulas_(sheet, staffName) {
     .build();
 
   const holidayRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied(`=AND($A5<>"",COUNTIF('${HOLIDAYS_SHEET_NAME}'!$A:$A,$A5)>0)`)
+    .whenFormulaSatisfied('=AND($A5<>"",$J5=1)')
     .setFontColor('#dc2626')
     .setBackground('#ffe0e0')
     .setRanges([dataRange])
