@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.18
+ *  勤怠管理システム — Google Apps Script  ver1.19
  * ====================================
  *
  *  セットアップ手順:
@@ -542,7 +542,7 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('G44:I44').setBackground('#f8f9fa');
 
   // --- 行45: 計算式の説明 ---
-  sheet.getRange('E45').setValue('計算式: 時間＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E45').setValue('計算式: 時間＋（分÷60）  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
   sheet.getRange('E45:I45').merge();
 
   // --- 行47: 勤務日数 ---
@@ -822,7 +822,7 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange('G44:I44').setBackground('#f8f9fa');
 
   // 行45: 計算式の説明
-  sheet.getRange('E45').setValue('計算式: 時間＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E45').setValue('計算式: 時間＋（分÷60）  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
   sheet.getRange('E45:I45').merge();
 
   // 行47: 勤務日数
