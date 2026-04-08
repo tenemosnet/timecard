@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.20
+ *  勤怠管理システム — Google Apps Script  ver1.21
  * ====================================
  *
  *  セットアップ手順:
@@ -954,6 +954,18 @@ function getStaffWithStatus() {
     .filter(s => !s.isSheetHidden())
     .map(s => s.getName())
     .filter(n => !SYSTEM_SHEET_NAMES.includes(n));
+
+  // スタッフ設定シートの表示順でソート
+  const settingsSheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  const sortMap = {};
+  if (settingsSheet && settingsSheet.getLastRow() > 1) {
+    const cols = settingsSheet.getLastColumn();
+    const data = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, Math.max(cols, 3)).getValues();
+    data.forEach(row => {
+      sortMap[row[0]] = row[2] !== '' && row[2] !== undefined ? row[2] : 9999;
+    });
+  }
+  staffNames.sort((a, b) => ((sortMap[a] ?? 9999) - (sortMap[b] ?? 9999)));
 
   return staffNames.map(name => {
     let status = 'none';
