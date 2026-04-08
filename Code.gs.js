@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.17
+ *  勤怠管理システム — Google Apps Script  ver1.18
  * ====================================
  *
  *  セットアップ手順:
@@ -494,7 +494,7 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('G38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   // 土日 or 祝日の行のH列を合計
   sheet.getRange('H38').setFormula(
-    '=SUMPRODUCT((OR(WEEKDAY(A5:A35)=1,WEEKDAY(A5:A35)=7)+(J5:J35<>"")>0)*(H5:H35<>"")*H5:H35)'
+    '=SUMPRODUCT(((WEEKDAY(A5:A35)=1)+(WEEKDAY(A5:A35)=7)+(J5:J35<>"")>0)*(H5:H35<>"")*H5:H35)'
   );
   sheet.getRange('H38').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A38:I38').setBackground('#f8f9fa');
@@ -542,7 +542,7 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('G44:I44').setBackground('#f8f9fa');
 
   // --- 行45: 計算式の説明 ---
-  sheet.getRange('E45').setValue('計算式: 合計時間×24  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E45').setValue('計算式: 時間＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
   sheet.getRange('E45:I45').merge();
 
   // --- 行47: 勤務日数 ---
@@ -779,7 +779,7 @@ function updateSheetFormulas_(sheet, staffName) {
   // 行38: 深夜内訳（祝祭日分）
   sheet.getRange('G38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H38').setFormula(
-    '=SUMPRODUCT((OR(WEEKDAY(A5:A35)=1,WEEKDAY(A5:A35)=7)+(J5:J35<>"")>0)*(H5:H35<>"")*H5:H35)'
+    '=SUMPRODUCT(((WEEKDAY(A5:A35)=1)+(WEEKDAY(A5:A35)=7)+(J5:J35<>"")>0)*(H5:H35<>"")*H5:H35)'
   );
   sheet.getRange('H38').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A38:I38').setBackground('#f8f9fa');
@@ -822,7 +822,7 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange('G44:I44').setBackground('#f8f9fa');
 
   // 行45: 計算式の説明
-  sheet.getRange('E45').setValue('計算式: 合計時間×24  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
+  sheet.getRange('E45').setValue('計算式: 時間＋分÷60  小数点第3位切り捨て').setFontSize(8).setFontColor('#888888');
   sheet.getRange('E45:I45').merge();
 
   // 行47: 勤務日数
