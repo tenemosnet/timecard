@@ -716,6 +716,31 @@ function updateSheetFormulas_(sheet, staffName) {
   const log = LOG_SHEET_NAME;
   const hol = HOLIDAYS_SHEET_NAME;
 
+  // --- 行2: レイアウト移行（旧: C2=年：,D2=年,E2=月：,F2=月 → 新: B2=年,C2=年,D2=月,E2=月） ---
+  const oldD2 = sheet.getRange('D2').getValue();
+  const oldF2 = sheet.getRange('F2').getValue();
+  const oldC2 = sheet.getRange('C2').getValue();
+  if (String(oldC2).indexOf('：') !== -1 && oldF2) {
+    // 旧レイアウト検出: C2が「年：」（コロン付き）でF2に月の値がある
+    sheet.getRange('B2').setValue(oldD2).setFontWeight('bold');
+    sheet.getRange('C2').setValue('年');
+    sheet.getRange('D2').setValue(oldF2).setFontWeight('bold');
+    sheet.getRange('E2').setValue('月');
+    sheet.getRange('F2').clearContent();
+  }
+
+  // A列・B列の数式を更新（B2/D2参照に統一）
+  for (let i = 0; i < 31; i++) {
+    const row = i + 5;
+    const dayOffset = i;
+    sheet.getRange(row, 1).setFormula(
+      `=LET(startDate,DATE(B2,D2-1,16),d,startDate+${dayOffset},endDate,DATE(B2,D2,${CUTOFF_DAY}),IF(d<=endDate,d,""))`
+    );
+    sheet.getRange(row, 2).setFormula(
+      `=IF(A${row}="","",CHOOSE(WEEKDAY(A${row}),"日","月","火","水","木","金","土"))`
+    );
+  }
+
   // E〜H列の数式を配列で一括構築（行5〜35）
   const formulas = [];
   for (let i = 0; i < 31; i++) {
