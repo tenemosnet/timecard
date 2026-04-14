@@ -69,6 +69,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step !== 'error') {
         } catch (PDOException $e) {
             $error = 'テーブル作成エラー: ' . $e->getMessage();
         }
+    } elseif ($action === 'reset_password') {
+        $username = trim($_POST['username'] ?? '');
+        $newPassword = $_POST['new_password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
+
+        if ($username === '' || $newPassword === '' || $confirmPassword === '') {
+            $error = 'すべての項目を入力してください。';
+        } elseif (strlen($newPassword) < 8) {
+            $error = 'パスワードは8文字以上にしてください。';
+        } elseif ($newPassword !== $confirmPassword) {
+            $error = 'パスワードが一致しません。';
+        } else {
+            $stmt = $pdo->prepare('SELECT id FROM admin_users WHERE username = ?');
+            $stmt->execute([$username]);
+            $user = $stmt->fetch();
+
+            if (!$user) {
+                $error = 'そのユーザーIDは存在しません。';
+            } else {
+                $hash = password_hash($newPassword, PASSWORD_BCRYPT);
+                $stmt = $pdo->prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?');
+                $stmt->execute([$hash, $user['id']]);
+                $message = 'パスワードをリセットしました。新しいパスワードでログインしてください。';
+            }
+        }
+        $step = 'done';
+
     } elseif ($action === 'create_admin') {
         $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
@@ -182,9 +209,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step !== 'error') {
 
         <?php elseif ($step === 'done'): ?>
             <div class="alert alert-warning">
-                セットアップ済みです。セキュリティのため、このファイル (setup.php) をサーバーから削除してください。
+                セットアップ済みです。このページはパスワードリセットにも使用できます。
             </div>
-            <p style="margin-top:1rem;"><a href="index.php" style="color:#4f8cff;">ログインページへ →</a></p>
+
+            <h2 style="font-size:1.1rem; margin-top:1.5rem; margin-bottom:0.75rem; color:#fff;">パスワードリセット</h2>
+            <form method="POST">
+                <input type="hidden" name="action" value="reset_password">
+                <label for="username">ユーザーID</label>
+                <input type="text" id="username" name="username" required>
+                <label for="new_password">新しいパスワード（8文字以上）</label>
+                <input type="password" id="new_password" name="new_password" required minlength="8">
+                <label for="confirm_password">新しいパスワード（確認）</label>
+                <input type="password" id="confirm_password" name="confirm_password" required minlength="8">
+                <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">パスワードをリセット</button>
+            </form>
+
+            <p style="margin-top:1.5rem;"><a href="index.php" style="color:#4f8cff;">ログインページへ →</a></p>
         <?php endif; ?>
     </div>
 </body>

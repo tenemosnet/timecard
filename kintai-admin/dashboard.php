@@ -37,6 +37,7 @@ $currentMonth = (int)date('n');
         <div class="header-right">
             <a href="<?= htmlspecialchars(GAS_API_URL) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-primary">打刻画面を開く</a>
             <span class="user-name"><?= $displayName ?></span>
+            <a href="change-password.php" class="btn btn-sm btn-outline">パスワード変更</a>
             <a href="logout.php" class="btn btn-sm btn-outline">ログアウト</a>
         </div>
     </header>
