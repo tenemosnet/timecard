@@ -480,8 +480,6 @@
     <div class="leave-form">
       <label>対象日</label>
       <input type="date" id="leaveDate">
-      <label>理由メモ（任意）</label>
-      <input type="text" id="leaveMemo" placeholder="例: 通院">
     </div>
     <div class="modal-btns">
       <button class="btn btn-cancel" onclick="closeLeaveModal()">キャンセル</button>
@@ -668,7 +666,6 @@
       return;
     }
 
-    var memo = document.getElementById('leaveMemo').value;
     var name = pendingLeave.name;
 
     isProcessing = true;
@@ -686,7 +683,7 @@
         showToast(err.message, 'error');
         loadStaff();
       })
-      .recordPaidLeave(name, dateVal, memo);
+      .recordPaidLeave(name, dateVal, '');
   }
 
   // ===== トースト =====
