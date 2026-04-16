@@ -813,13 +813,13 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange('I36').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888').setFontWeight('normal');
 
   // 行37: 深夜内訳（深夜分）
-  sheet.getRange('I37').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I37').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('left').setFontColor('#555555');
   sheet.getRange('H37').setFormula('=H36-H38');
   sheet.getRange('H37').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A37:I37').setBackground('#f8f9fa');
 
   // 行38: 深夜内訳（祝祭日分）
-  sheet.getRange('I38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('left').setFontColor('#555555');
   sheet.getRange('H38').setFormula(
     '=SUMPRODUCT(((WEEKDAY(A5:A35)=1)+(WEEKDAY(A5:A35)=7)+(J5:J35<>"")>0)*(H5:H35<>"")*H5:H35)'
   );
