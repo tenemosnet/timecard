@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.22
+ *  勤怠管理システム — Google Apps Script  ver1.23
  * ====================================
  *
  *  セットアップ手順:
@@ -789,6 +789,19 @@ function updateSheetFormulas_(sheet, staffName) {
       `=IF(A${row}="","",CHOOSE(WEEKDAY(A${row}),"日","月","火","水","木","金","土"))`
     );
   }
+
+  // C列・D列: 開始/終了時間のFILTER数式を復元（手入力で上書きされた場合の修復）
+  for (let i = 0; i < 31; i++) {
+    const row = i + 5;
+    sheet.getRange(row, 3).setFormula(
+      `=IFERROR(INDEX(FILTER('${log}'!$A:$A,'${log}'!$D:$D=A${row},'${log}'!$B:$B="${staffName}",'${log}'!$C:$C="入室"),1),"")`
+    );
+    sheet.getRange(row, 4).setFormula(
+      `=IFERROR(INDEX(FILTER('${log}'!$A:$A,'${log}'!$D:$D=A${row},'${log}'!$B:$B="${staffName}",'${log}'!$C:$C="退室"),1),"")`
+    );
+  }
+  sheet.getRange(5, 3, 31, 1).setNumberFormat('H:mm');
+  sheet.getRange(5, 4, 31, 1).setNumberFormat('H:mm');
 
   // E〜H列の数式を配列で一括構築（行5〜35）
   const formulas = [];

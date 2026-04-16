@@ -208,6 +208,15 @@ $currentMonth = (int)date('n');
             </div>
         </section>
 
+        <!-- 注意書き -->
+        <section class="card card-warning">
+            <h2>打刻データの修正について</h2>
+            <p>打刻データを修正する場合は、<strong>スプレッドシートのセルを直接編集しないでください。</strong><br>
+            セルに直接入力すると数式（FILTER関数）が上書きされ、以降の自動集計が正しく動作しなくなります。</p>
+            <p><strong>正しい修正方法:</strong> 「打刻ログ」シートのデータを修正してください。スタッフ個別シートのC列・D列は打刻ログから自動取得されます。</p>
+            <p class="text-muted" style="font-size:0.8rem;">万一数式が壊れた場合は、スプレッドシートのメニュー「勤怠管理 → 数式を個別更新（1名）」で復旧できます。</p>
+        </section>
+
         <!-- ステータスセクション -->
         <section class="card">
             <h2>ステータス</h2>
