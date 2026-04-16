@@ -50,6 +50,7 @@ function onOpen() {
     .addItem('曜日の数式を修復', 'fixWeekdayFormulas')
     .addItem('罫線を一括適用', 'applyBordersToAll')
     .addItem('数式を一括更新', 'updateAllFormulas')
+    .addItem('数式を個別更新（1名）', 'updateSingleStaffFormulas')
     .addItem('祝日を更新', 'updateHolidays')
     .addItem('祝日トリガーを設定', 'setupHolidayTrigger')
     .addItem('スタッフ名を変更', 'showStaffHelp')
@@ -724,6 +725,40 @@ function updateAllFormulas() {
   });
 
   ui.alert('完了', count + '名分のシートの数式を更新しました。', ui.ButtonSet.OK);
+}
+
+// =====================================================================
+//  個別スタッフの数式を更新（メニューから実行）
+// =====================================================================
+function updateSingleStaffFormulas() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  const staffSheets = ss.getSheets()
+    .filter(s => !SYSTEM_SHEET_NAMES.includes(s.getName()) && !s.isSheetHidden())
+    .map(s => s.getName());
+
+  if (staffSheets.length === 0) {
+    ui.alert('エラー', 'スタッフシートが見つかりません。', ui.ButtonSet.OK);
+    return;
+  }
+
+  const res = ui.prompt(
+    '個別スタッフの数式更新',
+    'スタッフ名を入力してください:\n\n' + staffSheets.join('、'),
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (res.getSelectedButton() !== ui.Button.OK) return;
+
+  const name = res.getResponseText().trim();
+  const sheet = ss.getSheetByName(name);
+  if (!sheet || SYSTEM_SHEET_NAMES.includes(name)) {
+    ui.alert('エラー', '「' + name + '」というスタッフシートが見つかりません。', ui.ButtonSet.OK);
+    return;
+  }
+
+  updateSheetFormulas_(sheet, name);
+  ui.alert('完了', name + 'さんのシートの数式を更新しました。', ui.ButtonSet.OK);
 }
 
 function updateSheetFormulas_(sheet, staffName) {
