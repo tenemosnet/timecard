@@ -487,13 +487,13 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('I36').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888').setFontWeight('normal');
 
   // --- 行37: 深夜残業の内訳（深夜分） ---
-  sheet.getRange('G37').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I37').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H37').setFormula('=H36-H38');
   sheet.getRange('H37').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A37:I37').setBackground('#f8f9fa');
 
   // --- 行38: 深夜残業の内訳（祝祭日分） ---
-  sheet.getRange('G38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   // 土日 or 祝日の行のH列を合計
   sheet.getRange('H38').setFormula(
     '=SUMPRODUCT(((WEEKDAY(A5:A35)=1)+(WEEKDAY(A5:A35)=7)+(J5:J35<>"")>0)*(H5:H35<>"")*H5:H35)'
@@ -529,13 +529,13 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('I42').setBackground('#f8f9fa');
 
   // --- 行43: 給与計算用 深夜内訳（深夜分） ---
-  sheet.getRange('G43').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I43').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H43').setFormula('=TRUNC(H37*24,2)');
   sheet.getRange('H43').setNumberFormat('0.00').setFontWeight('bold');
   sheet.getRange('A43:I43').setBackground('#f8f9fa');
 
   // --- 行44: 給与計算用 深夜内訳（祝祭日分） ---
-  sheet.getRange('G44').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I44').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H44').setFormula('=TRUNC(H38*24,2)');
   sheet.getRange('H44').setNumberFormat('0.00').setFontWeight('bold');
   sheet.getRange('A44:I44').setBackground('#f8f9fa');
@@ -643,9 +643,11 @@ function applyBorders_(sheet) {
 
   // 下部合計行（行36）: 上線を太め + 全罫線
   sheet.getRange('A36:I36').setBorder(true, true, true, true, true, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  // G36:H36の下罫線を太線に
+  sheet.getRange('G36:H36').setBorder(null, null, true, null, null, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
   // 深夜内訳行（行37-38）: H列に細罫線
-  sheet.getRange('G37:H38').setBorder(true, true, true, true, true, null, thinColor, border);
+  sheet.getRange('H37:H38').setBorder(true, true, true, true, true, null, thinColor, border);
 
   // 総合計行（行39）: 罫線で囲む
   sheet.getRange('D39:F39').setBorder(true, true, true, true, true, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
@@ -655,8 +657,10 @@ function applyBorders_(sheet) {
 
   // 給与計算用（行42）: 太線で囲む
   sheet.getRange('E42:H42').setBorder(true, true, true, true, true, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
-  // 深夜内訳（行43-44）: 細罫線
-  sheet.getRange('G43:H44').setBorder(true, true, true, true, true, null, thinColor, border);
+  // G42:H42の下罫線を太線に
+  sheet.getRange('G42:H42').setBorder(null, null, true, null, null, null, headerColor, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  // 深夜内訳（行43-44）: H列に細罫線
+  sheet.getRange('H43:H44').setBorder(true, true, true, true, true, null, thinColor, border);
 
   // 出勤日数等の項目・入力欄（C47:F48）を罫線で囲む
   sheet.getRange('C47:F48').setBorder(true, true, true, true, true, true, thinColor, border);
@@ -804,13 +808,13 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange('I36').setValue('※合計は1分単位').setFontSize(8).setFontColor('#888888').setFontWeight('normal');
 
   // 行37: 深夜内訳（深夜分）
-  sheet.getRange('G37').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I37').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H37').setFormula('=H36-H38');
   sheet.getRange('H37').setNumberFormat('[h]:mm').setFontWeight('bold');
   sheet.getRange('A37:I37').setBackground('#f8f9fa');
 
   // 行38: 深夜内訳（祝祭日分）
-  sheet.getRange('G38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I38').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H38').setFormula(
     '=SUMPRODUCT(((WEEKDAY(A5:A35)=1)+(WEEKDAY(A5:A35)=7)+(J5:J35<>"")>0)*(H5:H35<>"")*H5:H35)'
   );
@@ -840,13 +844,13 @@ function updateSheetFormulas_(sheet, staffName) {
   sheet.getRange('I42').setBackground('#f8f9fa');
 
   // 行43: 給与計算用 深夜内訳（深夜分）
-  sheet.getRange('G43').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I43').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H43').setFormula('=TRUNC(H37*24,2)');
   sheet.getRange('H43').setNumberFormat('0.00').setFontWeight('bold');
   sheet.getRange('A43:I43').setBackground('#f8f9fa');
 
   // 行44: 給与計算用 深夜内訳（祝祭日分）
-  sheet.getRange('G44').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
+  sheet.getRange('I44').setValue('（祝祭日分）').setFontSize(8).setHorizontalAlignment('right').setFontColor('#555555');
   sheet.getRange('H44').setFormula('=TRUNC(H38*24,2)');
   sheet.getRange('H44').setNumberFormat('0.00').setFontWeight('bold');
   sheet.getRange('A44:I44').setBackground('#f8f9fa');
