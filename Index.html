@@ -232,6 +232,61 @@
     letter-spacing: 1px;
   }
 
+  /* 有給申請ボタン */
+  .leave-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(139,92,246,0.3);
+    background: rgba(139,92,246,0.1);
+    color: #a78bfa;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    margin-top: 12px;
+  }
+  .leave-btn:active { transform: scale(0.96); }
+  .leave-btn:hover { background: rgba(139,92,246,0.18); }
+
+  /* 有給モーダル */
+  .leave-form { text-align: left; margin-bottom: 28px; }
+  .leave-form label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-sub);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .leave-form input[type="date"],
+  .leave-form input[type="text"] {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 16px;
+  }
+  .leave-form input:focus {
+    border-color: rgba(139,92,246,0.5);
+  }
+  .btn-leave {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(139,92,246,0.3);
+  }
+
   /* モーダル */
   .modal-overlay {
     display: none;
@@ -417,6 +472,24 @@
   </div>
 </div>
 
+<!-- 有給申請モーダル -->
+<div class="modal-overlay" id="leaveModal">
+  <div class="modal-box">
+    <div class="modal-title" style="color: #a78bfa;">有給申請</div>
+    <div class="modal-sub" id="leaveModalSub"></div>
+    <div class="leave-form">
+      <label>対象日</label>
+      <input type="date" id="leaveDate">
+      <label>理由メモ（任意）</label>
+      <input type="text" id="leaveMemo" placeholder="例: 通院">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeLeaveModal()">キャンセル</button>
+      <button class="btn btn-leave" id="leaveConfirmBtn" onclick="confirmLeave()">申請する</button>
+    </div>
+  </div>
+</div>
+
 <!-- トーストコンテナ -->
 <div id="toasts"></div>
 
@@ -424,6 +497,7 @@
   // ===== 状態 =====
   var staffData = [];
   var pendingAction = null;
+  var pendingLeave = null;
   var isProcessing = false;
   var DAY_NAMES = ['日','月','火','水','木','金','土'];
 
@@ -497,6 +571,7 @@
       }
       html += '</div>';
       html += timeHtml;
+      html += '<button class="leave-btn" onclick="event.stopPropagation(); openLeaveModal(\'' + s.name.replace(/'/g, "\\'") + '\')">&#x1F4C5; 有給申請</button>';
       html += '</div>';
     });
 
@@ -559,6 +634,59 @@
         loadStaff();
       })
       .recordClock(name, type);
+  }
+
+  // ===== 有給申請モーダル =====
+  function openLeaveModal(name) {
+    if (isProcessing) return;
+    pendingLeave = { name: name };
+
+    document.getElementById('leaveModalSub').textContent = name + 'さんの有給申請';
+
+    // デフォルト日付を今日に設定
+    var now = new Date();
+    var y = now.getFullYear();
+    var m = String(now.getMonth() + 1).padStart(2, '0');
+    var d = String(now.getDate()).padStart(2, '0');
+    document.getElementById('leaveDate').value = y + '-' + m + '-' + d;
+    document.getElementById('leaveMemo').value = '';
+
+    document.getElementById('leaveModal').classList.add('show');
+  }
+
+  function closeLeaveModal() {
+    document.getElementById('leaveModal').classList.remove('show');
+    pendingLeave = null;
+  }
+
+  function confirmLeave() {
+    if (!pendingLeave || isProcessing) return;
+
+    var dateVal = document.getElementById('leaveDate').value;
+    if (!dateVal) {
+      showToast('日付を選択してください', 'error');
+      return;
+    }
+
+    var memo = document.getElementById('leaveMemo').value;
+    var name = pendingLeave.name;
+
+    isProcessing = true;
+    closeLeaveModal();
+    renderStaff();
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        isProcessing = false;
+        showToast(result.message, 'success');
+        loadStaff();
+      })
+      .withFailureHandler(function(err) {
+        isProcessing = false;
+        showToast(err.message, 'error');
+        loadStaff();
+      })
+      .recordPaidLeave(name, dateVal, memo);
   }
 
   // ===== トースト =====
