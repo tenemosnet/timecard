@@ -33,7 +33,13 @@ $currentMonth = (int)date('n');
 </head>
 <body>
     <header class="header">
-        <h1>勤怠管理 管理者ページ</h1>
+        <div class="header-left">
+            <h1>勤怠管理</h1>
+            <nav class="nav-links">
+                <a href="dashboard.php" class="active">ダッシュボード</a>
+                <a href="clocklog.php">打刻データ修正</a>
+            </nav>
+        </div>
         <div class="header-right">
             <a href="<?= htmlspecialchars(GAS_API_URL) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-primary">打刻画面を開く</a>
             <span class="user-name"><?= $displayName ?></span>
@@ -208,13 +214,11 @@ $currentMonth = (int)date('n');
             </div>
         </section>
 
-        <!-- 注意書き -->
-        <section class="card card-warning">
-            <h2>打刻データの修正について</h2>
-            <p>打刻データを修正する場合は、<strong>スプレッドシートのセルを直接編集しないでください。</strong><br>
-            セルに直接入力すると数式（FILTER関数）が上書きされ、以降の自動集計が正しく動作しなくなります。</p>
-            <p><strong>正しい修正方法:</strong> 「打刻ログ」シートのデータを修正してください。スタッフ個別シートのC列・D列は打刻ログから自動取得されます。</p>
-            <p class="text-muted" style="font-size:0.8rem;">万一数式が壊れた場合は、スプレッドシートのメニュー「勤怠管理 → 数式を個別更新（1名）」で復旧できます。</p>
+        <!-- 打刻修正への誘導 -->
+        <section class="card">
+            <h2>打刻データの修正</h2>
+            <p>打刻の追加・修正・削除は、<a href="clocklog.php"><strong>打刻データ修正ページ</strong></a>から行えます。</p>
+            <p class="text-muted" style="font-size:0.85rem;">スプレッドシートのセルを直接編集すると数式が壊れる場合があります。修正は必ず管理画面から行ってください。</p>
         </section>
 
         <!-- ステータスセクション -->
@@ -228,6 +232,10 @@ $currentMonth = (int)date('n');
 
     <input type="hidden" id="csrf-token" value="<?= htmlspecialchars($csrfToken) ?>">
     <input type="hidden" id="staff-list" value="<?= htmlspecialchars(json_encode($staffList)) ?>">
+
+    <footer style="text-align:center; padding:1.5rem; color:#8a7f6e; font-size:0.8rem;">
+        勤怠管理システム ver2.0
+    </footer>
 
     <script src="assets/app.js"></script>
 </body>

@@ -452,4 +452,341 @@ a:hover { text-decoration: underline; }
         flex-direction: column;
         align-items: flex-start;
     }
+
+    .search-form {
+        flex-direction: column;
+    }
+
+    .modal-content {
+        width: 95%;
+        margin: 2rem auto;
+    }
+}
+
+/* --- ナビゲーション --- */
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.header-left h1 {
+    font-size: 1.2rem;
+    color: #2d2a24;
+}
+
+.nav-links {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.nav-links a {
+    padding: 0.35rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #8a7f6e;
+    transition: background 0.15s, color 0.15s;
+}
+
+.nav-links a:hover {
+    background: #f0ebe3;
+    color: #3d3929;
+    text-decoration: none;
+}
+
+.nav-links a.active {
+    background: #b3712d;
+    color: #fff;
+}
+
+/* --- 種別バッジ --- */
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge-enter {
+    background: #e6f7ed;
+    color: #1a7a3a;
+}
+
+.badge-leave {
+    background: #e3eef9;
+    color: #2563a0;
+}
+
+.badge-paid {
+    background: #fef3e0;
+    color: #b3712d;
+}
+
+/* --- 検索フォーム --- */
+.search-form {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.search-form .form-group {
+    flex: 1;
+    min-width: 140px;
+}
+
+.search-form .form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #5c5545;
+    margin-bottom: 0.3rem;
+}
+
+.search-form .form-group select,
+.search-form .form-group input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d9d0c3;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: #3d3929;
+}
+
+.search-form .form-group select:focus,
+.search-form .form-group input:focus {
+    outline: none;
+    border-color: #b3712d;
+    box-shadow: 0 0 0 2px rgba(179, 113, 45, 0.15);
+}
+
+/* --- 結果テーブル（打刻ログ） --- */
+.clocklog-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.clocklog-table th {
+    background: #f5f0e8;
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #5c5545;
+    border-bottom: 2px solid #e8e0d4;
+}
+
+.clocklog-table td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #f0ebe3;
+    font-size: 0.9rem;
+}
+
+.clocklog-table tr:hover {
+    background: #faf7f2;
+}
+
+.clocklog-table .actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.btn-edit {
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #d9d0c3;
+    background: #fff;
+    color: #5c5545;
+    transition: background 0.15s;
+}
+
+.btn-edit:hover {
+    background: #f0ebe3;
+}
+
+.btn-delete {
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #e8c4c4;
+    background: #fff;
+    color: #c0392b;
+    transition: background 0.15s;
+}
+
+.btn-delete:hover {
+    background: #fdf0f0;
+}
+
+.btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #b3712d;
+    background: #b3712d;
+    color: #fff;
+    margin-top: 1rem;
+    transition: background 0.15s;
+}
+
+.btn-add:hover {
+    background: #9a6127;
+}
+
+.no-data {
+    text-align: center;
+    padding: 2rem;
+    color: #8a7f6e;
+    font-size: 0.95rem;
+}
+
+/* --- モーダル --- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 16px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 960px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.modal-content h3 {
+    font-size: 1.1rem;
+    color: #2d2a24;
+    margin-bottom: 1.25rem;
+}
+
+.modal-form-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.modal-form-row .form-group {
+    flex: 1;
+    min-width: 140px;
+}
+
+.modal-content .form-group {
+    margin-bottom: 1rem;
+}
+
+.modal-content .form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #5c5545;
+    margin-bottom: 0.3rem;
+}
+
+.modal-content .form-group select,
+.modal-content .form-group input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d9d0c3;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: #3d3929;
+}
+
+.modal-content .form-group select:focus,
+.modal-content .form-group input:focus {
+    outline: none;
+    border-color: #b3712d;
+    box-shadow: 0 0 0 2px rgba(179, 113, 45, 0.15);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+.modal-actions .btn {
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.modal-actions .btn-primary {
+    background: #b3712d;
+    color: #fff;
+    border: none;
+}
+
+.modal-actions .btn-primary:hover {
+    background: #9a6127;
+}
+
+.modal-actions .btn-secondary {
+    background: #fff;
+    color: #5c5545;
+    border: 1px solid #d9d0c3;
+}
+
+.modal-actions .btn-secondary:hover {
+    background: #f0ebe3;
+}
+
+/* --- トースト通知 --- */
+.toast {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    padding: 0.85rem 1.5rem;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    z-index: 300;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast-success {
+    background: #1a7a3a;
+    color: #fff;
+}
+
+.toast-error {
+    background: #c0392b;
+    color: #fff;
 }

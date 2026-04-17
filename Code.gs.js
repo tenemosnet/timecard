@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver1.23
+ *  勤怠管理システム — Google Apps Script  ver2.0
  * ====================================
  *
  *  セットアップ手順:
@@ -1307,6 +1307,9 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   // PDF出力前に罫線を確実に適用
   applyBorders_(sheet);
 
+  // 数式の再計算を確実に完了させる（FILTER数式等の反映待ち）
+  SpreadsheetApp.flush();
+
   // 同名ファイルが既にあれば削除
   const existing = folder.getFilesByName(fileName);
   while (existing.hasNext()) {
@@ -1427,6 +1430,14 @@ function doPost(e) {
         return jsonResponse_(apiUpdateStaffOrder_(params));
       case 'renameStaff':
         return jsonResponse_(apiRenameStaff_(params));
+      case 'getClockLog':
+        return jsonResponse_(apiGetClockLog_(params));
+      case 'addClockEntry':
+        return jsonResponse_(apiAddClockEntry_(params));
+      case 'editClockEntry':
+        return jsonResponse_(apiEditClockEntry_(params));
+      case 'deleteClockEntry':
+        return jsonResponse_(apiDeleteClockEntry_(params));
       default:
         return jsonResponse_({ success: false, error: '不明なアクション: ' + params.action });
     }
@@ -1797,5 +1808,223 @@ function showStaffHelp() {
     '4. 「スタッフ設定」シートに定時を設定',
     SpreadsheetApp.getUi().ButtonSet.OK
   );
+}
+
+// =====================================================================
+//  管理者API: 打刻ログ検索（指定日・スタッフ）
+// =====================================================================
+function apiGetClockLog_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) return { success: false, error: '打刻ログシートが見つかりません' };
+
+  const staffName = params.staffName || '';
+  const dateParts = String(params.date).split('-');
+  const targetDate = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
+  targetDate.setHours(0, 0, 0, 0);
+
+  const lastRow = logSheet.getLastRow();
+  if (lastRow < 2) return { success: true, data: [] };
+
+  const data = logSheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  const results = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+
+    const rowDate = new Date(row[3]);
+    rowDate.setHours(0, 0, 0, 0);
+    if (rowDate.getTime() !== targetDate.getTime()) continue;
+    if (staffName && row[1] !== staffName) continue;
+
+    results.push({
+      rowIndex: i + 2,  // シート上の行番号（1-based、ヘッダー除く）
+      timestamp: Utilities.formatDate(new Date(row[0]), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm'),
+      staffName: row[1],
+      type: row[2],
+      date: Utilities.formatDate(rowDate, 'Asia/Tokyo', 'yyyy/MM/dd')
+    });
+  }
+
+  return { success: true, data: results };
+}
+
+// =====================================================================
+//  管理者API: 打刻追加（押し忘れ・有給）
+// =====================================================================
+function apiAddClockEntry_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) return { success: false, error: '打刻ログシートが見つかりません' };
+
+  const staffName = params.staffName;
+  const type = params.type;  // '入室', '退室', '有給'
+  if (!staffName || !type) return { success: false, error: 'スタッフ名と種別は必須です' };
+  if (!['入室', '退室', '有給'].includes(type)) return { success: false, error: '種別が不正です: ' + type };
+
+  const dateParts = String(params.date).split('-');
+  const targetDate = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
+  targetDate.setHours(0, 0, 0, 0);
+
+  // 重複チェック
+  if (logSheet.getLastRow() > 1) {
+    const data = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
+    for (const row of data) {
+      if (!row[0]) continue;
+      const rowDate = new Date(row[3]);
+      rowDate.setHours(0, 0, 0, 0);
+      if (rowDate.getTime() === targetDate.getTime() && row[1] === staffName && row[2] === type) {
+        return { success: false, error: staffName + 'さんの同日・同種別の打刻が既に存在します' };
+      }
+    }
+  }
+
+  // 記録日時を組み立て
+  let recordTime;
+  if (type === '有給') {
+    // 有給は対象日の0:00として記録
+    recordTime = new Date(targetDate);
+  } else {
+    // 入室/退室は指定時刻で記録
+    if (!params.time) return { success: false, error: '入室/退室の場合、時刻は必須です' };
+    const timeParts = String(params.time).split(':');
+    recordTime = new Date(targetDate);
+    recordTime.setHours(Number(timeParts[0]), Number(timeParts[1]), 0, 0);
+  }
+
+  logSheet.appendRow([recordTime, staffName, type, targetDate]);
+  const lastRow = logSheet.getLastRow();
+  logSheet.getRange(lastRow, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+  logSheet.getRange(lastRow, 4).setNumberFormat('yyyy/MM/dd');
+
+  // 有給の場合、備考列にも記入
+  if (type === '有給') {
+    const staffSheet = ss.getSheetByName(staffName);
+    if (staffSheet) {
+      for (let i = 0; i < 31; i++) {
+        const cellDate = staffSheet.getRange(i + 5, 1).getValue();
+        if (cellDate instanceof Date) {
+          const d = new Date(cellDate);
+          d.setHours(0, 0, 0, 0);
+          if (d.getTime() === targetDate.getTime()) {
+            staffSheet.getRange(i + 5, 9).setValue('有給');
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return { success: true, message: staffName + 'さんの' + type + 'を追加しました' };
+}
+
+// =====================================================================
+//  管理者API: 打刻修正（時刻・種別の変更）
+// =====================================================================
+function apiEditClockEntry_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) return { success: false, error: '打刻ログシートが見つかりません' };
+
+  const rowIndex = Number(params.rowIndex);
+  if (!rowIndex || rowIndex < 2) return { success: false, error: '行番号が不正です' };
+  if (rowIndex > logSheet.getLastRow()) return { success: false, error: '指定行が存在しません' };
+
+  // 楽観的排他制御: 現在値を検証
+  const currentRow = logSheet.getRange(rowIndex, 1, 1, 4).getValues()[0];
+  const currentStaff = currentRow[1];
+  const currentDate = new Date(currentRow[3]);
+  currentDate.setHours(0, 0, 0, 0);
+
+  if (params.expectedStaff && currentStaff !== params.expectedStaff) {
+    return { success: false, error: 'データが他の操作で変更されています。再検索してください。' };
+  }
+  if (params.expectedDate) {
+    const expParts = String(params.expectedDate).split('-');
+    const expDate = new Date(Number(expParts[0]), Number(expParts[1]) - 1, Number(expParts[2]));
+    expDate.setHours(0, 0, 0, 0);
+    if (currentDate.getTime() !== expDate.getTime()) {
+      return { success: false, error: 'データが他の操作で変更されています。再検索してください。' };
+    }
+  }
+
+  // 新しい種別
+  const newType = params.newType || currentRow[2];
+  if (!['入室', '退室', '有給'].includes(newType)) return { success: false, error: '種別が不正です: ' + newType };
+
+  // 新しい記録日時を組み立て
+  let newRecordTime;
+  if (newType === '有給') {
+    newRecordTime = new Date(currentDate);
+  } else {
+    if (!params.newTime) return { success: false, error: '入室/退室の場合、時刻は必須です' };
+    const timeParts = String(params.newTime).split(':');
+    newRecordTime = new Date(currentDate);
+    newRecordTime.setHours(Number(timeParts[0]), Number(timeParts[1]), 0, 0);
+  }
+
+  // 更新
+  logSheet.getRange(rowIndex, 1).setValue(newRecordTime);
+  logSheet.getRange(rowIndex, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+  logSheet.getRange(rowIndex, 3).setValue(newType);
+
+  return { success: true, message: currentStaff + 'さんの打刻を修正しました' };
+}
+
+// =====================================================================
+//  管理者API: 打刻削除
+// =====================================================================
+function apiDeleteClockEntry_(params) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) return { success: false, error: '打刻ログシートが見つかりません' };
+
+  const rowIndex = Number(params.rowIndex);
+  if (!rowIndex || rowIndex < 2) return { success: false, error: '行番号が不正です' };
+  if (rowIndex > logSheet.getLastRow()) return { success: false, error: '指定行が存在しません' };
+
+  // 楽観的排他制御: 現在値を検証
+  const currentRow = logSheet.getRange(rowIndex, 1, 1, 4).getValues()[0];
+  const currentStaff = currentRow[1];
+  const currentType = currentRow[2];
+  const currentDate = new Date(currentRow[3]);
+  currentDate.setHours(0, 0, 0, 0);
+
+  if (params.expectedStaff && currentStaff !== params.expectedStaff) {
+    return { success: false, error: 'データが他の操作で変更されています。再検索してください。' };
+  }
+  if (params.expectedDate) {
+    const expParts = String(params.expectedDate).split('-');
+    const expDate = new Date(Number(expParts[0]), Number(expParts[1]) - 1, Number(expParts[2]));
+    expDate.setHours(0, 0, 0, 0);
+    if (currentDate.getTime() !== expDate.getTime()) {
+      return { success: false, error: 'データが他の操作で変更されています。再検索してください。' };
+    }
+  }
+
+  // 有給削除の場合、備考列もクリア
+  if (currentType === '有給') {
+    const staffSheet = ss.getSheetByName(currentStaff);
+    if (staffSheet) {
+      for (let i = 0; i < 31; i++) {
+        const cellDate = staffSheet.getRange(i + 5, 1).getValue();
+        if (cellDate instanceof Date) {
+          const d = new Date(cellDate);
+          d.setHours(0, 0, 0, 0);
+          if (d.getTime() === currentDate.getTime()) {
+            const note = staffSheet.getRange(i + 5, 9).getValue();
+            if (String(note).indexOf('有給') !== -1) {
+              staffSheet.getRange(i + 5, 9).clearContent();
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  logSheet.deleteRow(rowIndex);
+  return { success: true, message: currentStaff + 'さんの' + currentType + 'を削除しました' };
 }
 
