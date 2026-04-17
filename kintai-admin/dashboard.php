@@ -38,6 +38,7 @@ $currentMonth = (int)date('n');
             <nav class="nav-links">
                 <a href="dashboard.php" class="active">ダッシュボード</a>
                 <a href="clocklog.php">打刻データ修正</a>
+                <a href="staff_view.php" onclick="return openStaffSelect(event)">スタッフ閲覧</a>
             </nav>
         </div>
         <div class="header-right">
@@ -116,6 +117,15 @@ $currentMonth = (int)date('n');
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="list-month">月</label>
+                    <select id="list-month">
+                        <option value="">全月</option>
+                        <?php for ($m = 1; $m <= 12; $m++): ?>
+                            <option value="<?= $m ?>" <?= $m === $currentMonth ? 'selected' : '' ?>><?= $m ?>月</option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="list-staff">スタッフ</label>
                     <select id="list-staff">
                         <option value="">全員</option>
@@ -187,6 +197,7 @@ $currentMonth = (int)date('n');
                                 <button class="btn btn-sm btn-secondary btn-save-hours" data-staff="<?= htmlspecialchars($staff['name']) ?>">保存</button>
                                 <button class="btn btn-sm btn-rename-staff" data-staff="<?= htmlspecialchars($staff['name']) ?>">名前変更</button>
                                 <button class="btn btn-sm btn-danger btn-remove-staff" data-staff="<?= htmlspecialchars($staff['name']) ?>">削除</button>
+                                <button class="btn btn-sm btn-secondary btn-staff-page" data-staff="<?= htmlspecialchars($staff['name']) ?>">個人ページ</button>
                             </td>
                         </tr>
                         <?php endforeach; ?>

@@ -1,6 +1,29 @@
 <?php
-require_once __DIR__ . '/auth.php';
-requireLogin();
+require_once __DIR__ . '/config.php';
+
+// 管理者ログイン または スタッフトークンで認証
+$staffToken = trim($_GET['token'] ?? '');
+if ($staffToken !== '') {
+    // トークン認証
+    try {
+        $pdo = new PDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $stmt = $pdo->prepare('SELECT staff_name FROM staff_tokens WHERE token = ?');
+        $stmt->execute([$staffToken]);
+        if (!$stmt->fetchColumn()) {
+            http_response_code(403);
+            echo '認証エラー';
+            exit;
+        }
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo 'エラー';
+        exit;
+    }
+} else {
+    // 管理者認証
+    require_once __DIR__ . '/auth.php';
+    requireLogin();
+}
 
 $fileId = $_GET['id'] ?? '';
 

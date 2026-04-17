@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressText = document.getElementById('progress-text');
 
     const listYear = document.getElementById('list-year');
+    const listMonth = document.getElementById('list-month');
     const listStaff = document.getElementById('list-staff');
     const btnSearch = document.getElementById('btn-search');
     const pdfTbody = document.getElementById('pdf-tbody');
@@ -424,12 +425,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadPDFList() {
         const year = listYear.value;
+        const month = listMonth.value;
         const staff = listStaff.value;
         pdfTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">読み込み中...</td></tr>';
         pdfActionsBar.style.display = 'none';
 
         try {
             const params = new URLSearchParams({ year: year });
+            if (month) params.append('month', month);
             if (staff) params.append('staff', staff);
 
             const res = await fetch('list_pdfs.php?' + params.toString());
@@ -532,4 +535,92 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     checkDriveStatus();
+
+    // ===========================
+    // スタッフ個人ページ: トークン取得 → URLコピー
+    // ===========================
+    document.querySelectorAll('.btn-staff-page').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const name = btn.dataset.staff;
+            btn.disabled = true;
+            btn.textContent = '取得中...';
+
+            try {
+                const res = await fetch('staff_token.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        csrf_token: csrfToken,
+                        staffName: name,
+                        action: 'get_or_create',
+                    }),
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    const url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'staff_view.php?token=' + result.token;
+
+                    if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(url);
+                        alert(name + 'さんの個人ページURLをコピーしました。\n\n' + url);
+                    } else {
+                        prompt(name + 'さんの個人ページURL:', url);
+                    }
+                } else {
+                    alert('エラー: ' + (result.error || '不明なエラー'));
+                }
+            } catch (e) {
+                alert('通信エラー: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '個人ページ';
+            }
+        });
+    });
 });
+
+// ===========================
+// スタッフ閲覧ナビ: スタッフ選択ダイアログ
+// ===========================
+function openStaffSelect(event) {
+    event.preventDefault();
+    const staffListRaw = JSON.parse(document.getElementById('staff-list').value || '[]');
+    const names = staffListRaw.map(s => s.name || s);
+
+    if (names.length === 0) {
+        alert('スタッフが登録されていません。');
+        return false;
+    }
+
+    const choice = prompt('閲覧するスタッフ名を入力してください:\n\n' + names.join('、'));
+    if (!choice || !choice.trim()) return false;
+
+    const name = choice.trim();
+    if (!names.includes(name)) {
+        alert('「' + name + '」は登録されていません。');
+        return false;
+    }
+
+    // トークンを取得して遷移
+    const csrfToken = document.getElementById('csrf-token').value;
+    fetch('staff_token.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            csrf_token: csrfToken,
+            staffName: name,
+            action: 'get_or_create',
+        }),
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            window.open('staff_view.php?token=' + result.token, '_blank');
+        } else {
+            alert('エラー: ' + (result.error || ''));
+        }
+    })
+    .catch(err => alert('通信エラー: ' + err.message));
+
+    return false;
+}

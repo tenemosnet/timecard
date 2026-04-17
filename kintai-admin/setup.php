@@ -52,6 +52,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step !== 'error') {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
 
+            // staff_tokens テーブル（スタッフ個人閲覧用トークン）
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS staff_tokens (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    staff_name VARCHAR(100) NOT NULL UNIQUE,
+                    token VARCHAR(64) NOT NULL UNIQUE,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+
             // login_attempts テーブル
             $pdo->exec("
                 CREATE TABLE IF NOT EXISTS login_attempts (

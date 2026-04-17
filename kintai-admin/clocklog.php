@@ -35,6 +35,7 @@ try {
             <nav class="nav-links">
                 <a href="dashboard.php">ダッシュボード</a>
                 <a href="clocklog.php" class="active">打刻データ修正</a>
+                <a href="staff_view.php" onclick="return openStaffSelect(event)">スタッフ閲覧</a>
             </nav>
         </div>
         <div class="header-right">
@@ -140,6 +141,30 @@ try {
         勤怠管理システム ver2.0
     </footer>
 
+    <script>
+    function openStaffSelect(event) {
+        event.preventDefault();
+        const names = JSON.parse(document.getElementById('staffNamesJson').value || '[]');
+        if (names.length === 0) { alert('スタッフが登録されていません。'); return false; }
+        const choice = prompt('閲覧するスタッフ名を入力してください:\n\n' + names.join('、'));
+        if (!choice || !choice.trim()) return false;
+        const name = choice.trim();
+        if (!names.includes(name)) { alert('「' + name + '」は登録されていません。'); return false; }
+        const csrfToken = document.getElementById('csrfToken').value;
+        fetch('staff_token.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf_token: csrfToken, staffName: name, action: 'get_or_create' }),
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) window.open('staff_view.php?token=' + result.token, '_blank');
+            else alert('エラー: ' + (result.error || ''));
+        })
+        .catch(err => alert('通信エラー: ' + err.message));
+        return false;
+    }
+    </script>
     <script src="assets/clocklog.js"></script>
 </body>
 </html>

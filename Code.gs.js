@@ -1291,7 +1291,7 @@ function getOrCreateFolder_(year, month) {
 function generateSinglePDF_(ss, sheet, year, month, folder) {
   const staffName = sheet.getName();
   const monthStr = String(month).padStart(2, '0');
-  const fileName = staffName + '_' + year + '年' + monthStr + '月_勤怠表.pdf';
+  const fileName = staffName + '_' + year + '年' + monthStr + '月_tenemosタイムカード.pdf';
 
   // シートのB2/D2が指定年月と異なる場合、一時変更
   const origYear = sheet.getRange('B2').getValue();
@@ -1491,10 +1491,20 @@ function apiListPDFs_(params) {
   yearFolder = yearFolders.next();
 
   const results = [];
-  const monthFolders = yearFolder.getFolders();
+  const filterMonth = params.month ? parseInt(params.month) : null;
 
-  while (monthFolders.hasNext()) {
-    const mFolder = monthFolders.next();
+  // 月指定がある場合はそのフォルダだけ、なければ全月
+  const monthFoldersToScan = [];
+  if (filterMonth) {
+    const mStr = String(filterMonth).padStart(2, '0');
+    const mfs = yearFolder.getFoldersByName(mStr);
+    if (mfs.hasNext()) monthFoldersToScan.push(mfs.next());
+  } else {
+    const allMf = yearFolder.getFolders();
+    while (allMf.hasNext()) monthFoldersToScan.push(allMf.next());
+  }
+
+  for (const mFolder of monthFoldersToScan) {
     const monthNum = parseInt(mFolder.getName());
     const files = mFolder.getFiles();
 
