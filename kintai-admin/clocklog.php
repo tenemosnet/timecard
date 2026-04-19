@@ -35,7 +35,7 @@ try {
             <nav class="nav-links">
                 <a href="dashboard.php">ダッシュボード</a>
                 <a href="clocklog.php" class="active">打刻データ修正</a>
-                <a href="staff_view.php" onclick="return openStaffSelect(event)">スタッフ閲覧</a>
+                <a href="#" onclick="return openStaffSelect(event)">スタッフ閲覧</a>
             </nav>
         </div>
         <div class="header-right">
@@ -137,33 +137,59 @@ try {
     <input type="hidden" id="csrfToken" value="<?= htmlspecialchars($csrfToken) ?>">
     <input type="hidden" id="staffNamesJson" value="<?= htmlspecialchars(json_encode($staffNames)) ?>">
 
+    <!-- スタッフ選択モーダル -->
+    <div class="modal-overlay" id="staffSelectModal">
+        <div class="modal-content" style="max-width:400px;">
+            <h3>スタッフ閲覧</h3>
+            <div class="form-group">
+                <label for="staffSelectName">スタッフを選択</label>
+                <select id="staffSelectName">
+                    <?php foreach ($staffNames as $name): ?>
+                        <option value="<?= htmlspecialchars($name) ?>"><?= htmlspecialchars($name) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="staffSelectCancel">キャンセル</button>
+                <button class="btn btn-primary" id="staffSelectOpen">開く</button>
+            </div>
+        </div>
+    </div>
+
     <footer style="text-align:center; padding:1.5rem; color:#8a7f6e; font-size:0.8rem;">
-        勤怠管理システム ver2.0
+        勤怠管理システム ver3.0
     </footer>
 
     <script>
     function openStaffSelect(event) {
         event.preventDefault();
-        const names = JSON.parse(document.getElementById('staffNamesJson').value || '[]');
-        if (names.length === 0) { alert('スタッフが登録されていません。'); return false; }
-        const choice = prompt('閲覧するスタッフ名を入力してください:\n\n' + names.join('、'));
-        if (!choice || !choice.trim()) return false;
-        const name = choice.trim();
-        if (!names.includes(name)) { alert('「' + name + '」は登録されていません。'); return false; }
-        const csrfToken = document.getElementById('csrfToken').value;
+        var modal = document.getElementById('staffSelectModal');
+        modal.classList.add('active');
+        return false;
+    }
+    document.getElementById('staffSelectCancel').addEventListener('click', function() {
+        document.getElementById('staffSelectModal').classList.remove('active');
+    });
+    document.getElementById('staffSelectOpen').addEventListener('click', function() {
+        var name = document.getElementById('staffSelectName').value;
+        if (!name) return;
+        document.getElementById('staffSelectModal').classList.remove('active');
+        var csrfToken = document.getElementById('csrfToken').value;
         fetch('staff_token.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ csrf_token: csrfToken, staffName: name, action: 'get_or_create' }),
         })
-        .then(res => res.json())
-        .then(result => {
-            if (result.success) window.open('staff_view.php?token=' + result.token, '_blank');
+        .then(function(res) { return res.json(); })
+        .then(function(result) {
+            if (result.success) window.location.href = 'staff_view.php?token=' + result.token;
             else alert('エラー: ' + (result.error || ''));
         })
-        .catch(err => alert('通信エラー: ' + err.message));
-        return false;
-    }
+        .catch(function(err) { alert('通信エラー: ' + err.message); });
+    });
+    document.getElementById('staffSelectModal').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('active');
+    });
     </script>
     <script src="assets/clocklog.js"></script>
 </body>

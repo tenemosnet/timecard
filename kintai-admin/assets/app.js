@@ -580,47 +580,51 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===========================
-// スタッフ閲覧ナビ: スタッフ選択ダイアログ
+// スタッフ閲覧ナビ: スタッフ選択モーダル
 // ===========================
 function openStaffSelect(event) {
     event.preventDefault();
-    const staffListRaw = JSON.parse(document.getElementById('staff-list').value || '[]');
-    const names = staffListRaw.map(s => s.name || s);
-
-    if (names.length === 0) {
-        alert('スタッフが登録されていません。');
-        return false;
-    }
-
-    const choice = prompt('閲覧するスタッフ名を入力してください:\n\n' + names.join('、'));
-    if (!choice || !choice.trim()) return false;
-
-    const name = choice.trim();
-    if (!names.includes(name)) {
-        alert('「' + name + '」は登録されていません。');
-        return false;
-    }
-
-    // トークンを取得して遷移
-    const csrfToken = document.getElementById('csrf-token').value;
-    fetch('staff_token.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            csrf_token: csrfToken,
-            staffName: name,
-            action: 'get_or_create',
-        }),
-    })
-    .then(res => res.json())
-    .then(result => {
-        if (result.success) {
-            window.open('staff_view.php?token=' + result.token, '_blank');
-        } else {
-            alert('エラー: ' + (result.error || ''));
-        }
-    })
-    .catch(err => alert('通信エラー: ' + err.message));
-
+    const modal = document.getElementById('staffSelectModal');
+    modal.classList.add('active');
     return false;
 }
+
+(function() {
+    const modal = document.getElementById('staffSelectModal');
+    if (!modal) return;
+
+    document.getElementById('staffSelectCancel').addEventListener('click', () => {
+        modal.classList.remove('active');
+    });
+
+    document.getElementById('staffSelectOpen').addEventListener('click', () => {
+        const name = document.getElementById('staffSelectName').value;
+        if (!name) return;
+        modal.classList.remove('active');
+
+        const csrfToken = document.getElementById('csrf-token').value;
+        fetch('staff_token.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                csrf_token: csrfToken,
+                staffName: name,
+                action: 'get_or_create',
+            }),
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                window.location.href = 'staff_view.php?token=' + result.token;
+            } else {
+                alert('エラー: ' + (result.error || ''));
+            }
+        })
+        .catch(err => alert('通信エラー: ' + err.message));
+    });
+
+    // オーバーレイクリックで閉じる
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('active');
+    });
+})();

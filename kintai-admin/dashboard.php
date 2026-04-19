@@ -38,7 +38,7 @@ $currentMonth = (int)date('n');
             <nav class="nav-links">
                 <a href="dashboard.php" class="active">ダッシュボード</a>
                 <a href="clocklog.php">打刻データ修正</a>
-                <a href="staff_view.php" onclick="return openStaffSelect(event)">スタッフ閲覧</a>
+                <a href="#" onclick="return openStaffSelect(event)">スタッフ閲覧</a>
             </nav>
         </div>
         <div class="header-right">
@@ -241,11 +241,30 @@ $currentMonth = (int)date('n');
         </section>
     </main>
 
+    <!-- スタッフ選択モーダル -->
+    <div class="modal-overlay" id="staffSelectModal">
+        <div class="modal-content" style="max-width:400px;">
+            <h3>スタッフ閲覧</h3>
+            <div class="form-group">
+                <label for="staffSelectName">スタッフを選択</label>
+                <select id="staffSelectName">
+                    <?php foreach ($staffNames as $name): ?>
+                        <option value="<?= htmlspecialchars($name) ?>"><?= htmlspecialchars($name) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="staffSelectCancel">キャンセル</button>
+                <button class="btn btn-primary" id="staffSelectOpen">開く</button>
+            </div>
+        </div>
+    </div>
+
     <input type="hidden" id="csrf-token" value="<?= htmlspecialchars($csrfToken) ?>">
     <input type="hidden" id="staff-list" value="<?= htmlspecialchars(json_encode($staffList)) ?>">
 
     <footer style="text-align:center; padding:1.5rem; color:#8a7f6e; font-size:0.8rem;">
-        勤怠管理システム ver2.0
+        勤怠管理システム ver3.0
     </footer>
 
     <script src="assets/app.js"></script>

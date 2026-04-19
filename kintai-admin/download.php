@@ -47,8 +47,9 @@ try {
     $pdfData = base64_decode($result['data']['base64']);
     $fileName = $result['data']['fileName'];
 
+    $disposition = ($_GET['view'] ?? '') === '1' ? 'inline' : 'attachment';
     header('Content-Type: application/pdf');
-    header('Content-Disposition: attachment; filename="' . $fileName . '"');
+    header('Content-Disposition: ' . $disposition . '; filename="' . $fileName . '"');
     header('Content-Length: ' . strlen($pdfData));
     header('Cache-Control: no-cache, no-store, must-revalidate');
     echo $pdfData;

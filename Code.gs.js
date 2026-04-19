@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver2.0
+ *  勤怠管理システム — Google Apps Script  ver3.0
  * ====================================
  *
  *  セットアップ手順:
@@ -371,7 +371,7 @@ function createStaffSheet_(ss, staffName, year, month) {
   );
 
   // --- 行3: カラムヘッダー ---
-  const headers = ['日', '曜日', '開始時間', '終了時間', '休憩時間', '定時内時間', '残業時間', '深夜残業時間', '備考'];
+  const headers = ['日', '曜日', '開始時間', '終了時間', '休憩時間', '定時内時間', '時間外', '深夜・休日', '備考'];
   sheet.getRange('A3:I3').setValues([headers]);
   sheet.getRange('A3:I3').setFontWeight('bold').setBackground('#e2e8f0')
     .setHorizontalAlignment('center');
@@ -442,9 +442,9 @@ function createStaffSheet_(ss, staffName, year, month) {
       `MAX(MAX(D${row}-C${row}-E${row}-$I$2/24,0)-MIN(IF(HOUR(D${row})>=22,MOD(D${row},1)-TIME(22,0,0),0),MAX(D${row}-C${row}-E${row}-$I$2/24,0)),0)` +
       `)),"")`
     );
-    sheet.getRange(row, 7).setNumberFormat('H:mm');
+    sheet.getRange(row, 7).setNumberFormat('[>0]H:mm;""');
 
-    // H列: 深夜残業時間
+    // H列: 深夜・休日
     // 7.5h定時: 8h超（法定外残業）、8h定時: 22時以降の勤務
     // 休日は全労働時間（休日残業）
     sheet.getRange(row, 8).setFormula(
@@ -455,7 +455,7 @@ function createStaffSheet_(ss, staffName, year, month) {
       `MIN(IF(HOUR(D${row})>=22,MOD(D${row},1)-TIME(22,0,0),0),MAX(D${row}-C${row}-E${row}-$I$2/24,0))` +
       `)),"")`
     );
-    sheet.getRange(row, 8).setNumberFormat('H:mm');
+    sheet.getRange(row, 8).setNumberFormat('[>0]H:mm;""');
 
     // I列: 備考（手動入力用）
 
@@ -529,10 +529,16 @@ function createStaffSheet_(ss, staffName, year, month) {
   sheet.getRange('A42:E42').setBackground('#f8f9fa');
   sheet.getRange('I42').setBackground('#f8f9fa');
 
-  // --- 行41: ↓矢印（10進法への変換を示す） ---
+  // --- 行41: ↓矢印 / 7.5h定時の場合は注記 ---
   sheet.getRange('F41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
-  sheet.getRange('G41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
-  sheet.getRange('H41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
+  const hours = getStaffSetting_(ss, staffName);
+  if (hours < 8) {
+    sheet.getRange('G41').setValue('（法定内）').setHorizontalAlignment('center').setFontColor('#000000').setFontSize(9);
+    sheet.getRange('H41').setValue('（時間外）').setHorizontalAlignment('center').setFontColor('#000000').setFontSize(9);
+  } else {
+    sheet.getRange('G41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
+    sheet.getRange('H41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
+  }
 
   // --- 行43: 給与計算用 深夜内訳（深夜分） ---
   sheet.getRange('I43').setValue('（深夜分）').setFontSize(8).setHorizontalAlignment('left').setFontColor('#555555');
@@ -836,8 +842,12 @@ function updateSheetFormulas_(sheet, staffName) {
   // フォーマット一括設定
   sheet.getRange(5, 5, 31, 1).setNumberFormat('H:mm');
   sheet.getRange(5, 6, 31, 1).setNumberFormat('H:mm');
-  sheet.getRange(5, 7, 31, 1).setNumberFormat('H:mm');
-  sheet.getRange(5, 8, 31, 1).setNumberFormat('H:mm');
+  sheet.getRange(5, 7, 31, 1).setNumberFormat('[>0]H:mm;""');
+  sheet.getRange(5, 8, 31, 1).setNumberFormat('[>0]H:mm;""');
+
+  // カラムヘッダーを更新
+  sheet.getRange('G3').setValue('時間外');
+  sheet.getRange('H3').setValue('深夜・休日');
 
   // 旧レイアウト（行36〜48）をクリア（行36の数式は残す、書式のみリセット）
   sheet.getRange('A37:I48').clearContent().clearFormat();
@@ -885,10 +895,17 @@ function updateSheetFormulas_(sheet, staffName) {
   // 注記
   sheet.getRange('F40').setValue('※休憩時間は含まない。').setFontSize(8).setFontColor('#888888');
 
-  // 行41: ↓矢印（10進法への変換を示す）
+  // 行41: ↓矢印 / 7.5h定時の場合は注記
   sheet.getRange('F41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
-  sheet.getRange('G41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
-  sheet.getRange('H41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
+  const ss = sheet.getParent();
+  const hours = getStaffSetting_(ss, staffName);
+  if (hours < 8) {
+    sheet.getRange('G41').setValue('（法定内）').setHorizontalAlignment('center').setFontColor('#000000').setFontSize(9);
+    sheet.getRange('H41').setValue('（時間外）').setHorizontalAlignment('center').setFontColor('#000000').setFontSize(9);
+  } else {
+    sheet.getRange('G41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
+    sheet.getRange('H41').setValue('↓').setHorizontalAlignment('center').setFontColor('#888888');
+  }
 
   // 行42: 給与計算用（10進法）
   sheet.getRange('E42').setValue('給与計算用').setFontWeight('bold').setHorizontalAlignment('center').setFontSize(9);
