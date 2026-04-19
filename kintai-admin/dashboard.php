@@ -144,6 +144,7 @@ $currentMonth = (int)date('n');
                 <label><input type="checkbox" id="pdf-select-all"> 全選択</label>
                 <span class="selected-count" id="pdf-selected-count">0件選択中</span>
                 <button id="btn-download-selected" class="btn btn-sm btn-download">選択分をDL</button>
+                <button id="btn-print-selected" class="btn btn-sm btn-primary">選択分を印刷</button>
             </div>
 
             <div id="pdf-list-area">
@@ -151,11 +152,11 @@ $currentMonth = (int)date('n');
                     <thead>
                         <tr>
                             <th style="width:30px;"></th>
-                            <th>月</th>
-                            <th>氏名</th>
+                            <th style="white-space:nowrap;">月</th>
+                            <th style="white-space:nowrap;">氏名</th>
                             <th>ファイル名</th>
-                            <th>生成日時</th>
-                            <th>操作</th>
+                            <th style="white-space:nowrap;">生成日時</th>
+                            <th style="white-space:nowrap;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="pdf-tbody">
@@ -267,6 +268,7 @@ $currentMonth = (int)date('n');
         勤怠管理システム ver3.0
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="assets/app.js"></script>
 </body>
 </html>

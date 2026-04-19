@@ -219,6 +219,68 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // 選択分を印刷（pdf-libで結合→iframe印刷）
+    const btnPrintSelected = document.getElementById('btn-print-selected');
+    btnPrintSelected.addEventListener('click', async () => {
+        const checked = pdfTbody.querySelectorAll('.pdf-checkbox:checked');
+        if (checked.length === 0) {
+            alert('印刷するPDFを選択してください。');
+            return;
+        }
+
+        btnPrintSelected.disabled = true;
+        btnPrintSelected.textContent = '結合中... (0/' + checked.length + ')';
+
+        try {
+            if (typeof PDFLib === 'undefined') {
+                throw new Error('PDF結合ライブラリが読み込まれていません。ページを再読み込みしてください。');
+            }
+
+            const mergedPdf = await PDFLib.PDFDocument.create();
+            let count = 0;
+
+            for (const cb of checked) {
+                const fileId = cb.dataset.fileId;
+                count++;
+                btnPrintSelected.textContent = '結合中... (' + count + '/' + checked.length + ')';
+                const res = await fetch('download.php?id=' + encodeURIComponent(fileId) + '&view=1');
+                if (!res.ok) throw new Error('PDF取得に失敗しました (ID: ' + fileId + ')');
+                const arrayBuf = await res.arrayBuffer();
+                const srcDoc = await PDFLib.PDFDocument.load(arrayBuf);
+                const pages = await mergedPdf.copyPages(srcDoc, srcDoc.getPageIndices());
+                pages.forEach(page => mergedPdf.addPage(page));
+            }
+
+            btnPrintSelected.textContent = '印刷準備中...';
+            const mergedBytes = await mergedPdf.save();
+            const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+
+            // iframeで印刷（ポップアップブロッカー回避）
+            let printFrame = document.getElementById('print-frame');
+            if (!printFrame) {
+                printFrame = document.createElement('iframe');
+                printFrame.id = 'print-frame';
+                printFrame.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+                document.body.appendChild(printFrame);
+            }
+            printFrame.src = url;
+            printFrame.onload = () => {
+                try {
+                    printFrame.contentWindow.print();
+                } catch (e) {
+                    // iframe印刷が失敗した場合、新タブで開く
+                    window.open(url, '_blank');
+                }
+            };
+        } catch (e) {
+            alert('PDF結合エラー: ' + e.message);
+        } finally {
+            btnPrintSelected.disabled = false;
+            btnPrintSelected.textContent = '選択分を印刷';
+        }
+    });
+
     function updateSelectedCount() {
         const checked = pdfTbody.querySelectorAll('.pdf-checkbox:checked');
         pdfSelectedCount.textContent = checked.length + '件選択中';
@@ -457,11 +519,11 @@ document.addEventListener('DOMContentLoaded', () => {
             pdfTbody.innerHTML = data.map(item => `
                 <tr>
                     <td><input type="checkbox" class="pdf-checkbox" data-file-id="${escapeHtml(item.fileId)}"></td>
-                    <td>${item.month}月</td>
-                    <td>${escapeHtml(item.staffName || '-')}</td>
+                    <td style="white-space:nowrap">${item.month}月</td>
+                    <td style="white-space:nowrap">${escapeHtml(item.staffName || '-')}</td>
                     <td>${escapeHtml(item.fileName)}</td>
-                    <td>${item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '-'}</td>
-                    <td class="actions">
+                    <td style="white-space:nowrap">${item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '-'}</td>
+                    <td class="actions" style="white-space:nowrap">
                         <a href="download.php?id=${encodeURIComponent(item.fileId)}" class="btn btn-sm btn-download">DL</a>
                         <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="btn btn-sm btn-view">表示</a>
                     </td>

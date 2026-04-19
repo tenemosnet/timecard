@@ -1327,10 +1327,14 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   // 数式の再計算を確実に完了させる（FILTER数式等の反映待ち）
   SpreadsheetApp.flush();
 
-  // 同名ファイルが既にあれば削除
-  const existing = folder.getFilesByName(fileName);
-  while (existing.hasNext()) {
-    existing.next().setTrashed(true);
+  // 同じスタッフ・同じ月のPDFが既にあれば削除（ファイル名変更にも対応）
+  const prefix = staffName + '_' + year + '年' + monthStr + '月_';
+  const allFiles = folder.getFiles();
+  while (allFiles.hasNext()) {
+    const f = allFiles.next();
+    if (f.getName().startsWith(prefix)) {
+      f.setTrashed(true);
+    }
   }
 
   // PDF生成（A1:I36 = タイトル〜下部合計行）
