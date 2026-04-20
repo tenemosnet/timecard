@@ -513,7 +513,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             data.sort((a, b) => {
                 if (b.month !== a.month) return b.month - a.month;
-                return (a.staffName || a.fileName).localeCompare(b.staffName || b.fileName, 'ja');
+                const idxA = staffNames.indexOf(a.staffName);
+                const idxB = staffNames.indexOf(b.staffName);
+                return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
             });
 
             pdfTbody.innerHTML = data.map(item => `

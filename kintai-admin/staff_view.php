@@ -170,6 +170,61 @@ $shortUrl = $protocol . '://' . $host . $dir . '/s.php?t=' . urlencode($token);
             display: inline-block;
         }
         .btn-view:hover { background: #4a6f7e; }
+
+        /* スマホ用カードレイアウト */
+        .pdf-card-list { display: none; }
+
+        @media (max-width: 640px) {
+            .pdf-table-wrap { display: none; }
+            .pdf-card-list { display: block; }
+            .pdf-card {
+                background: #fff;
+                border: 1px solid #e8e0d4;
+                border-radius: 8px;
+                padding: 0.75rem 1rem;
+                margin-bottom: 0.5rem;
+            }
+            .pdf-card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 0.4rem;
+            }
+            .pdf-card-month {
+                font-size: 1rem;
+                font-weight: 700;
+                color: #2d2a24;
+            }
+            .pdf-card-date {
+                font-size: 0.75rem;
+                color: #8a7f6e;
+            }
+            .pdf-card-actions {
+                display: flex;
+                gap: 0.5rem;
+            }
+            .pdf-card-actions a {
+                flex: 1;
+                text-align: center;
+                padding: 0.45rem 0;
+                border-radius: 6px;
+                font-size: 0.85rem;
+                text-decoration: none;
+            }
+            .share-url-box {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .share-url-box label {
+                margin-bottom: 0.3rem;
+            }
+            .share-url-box .url-row {
+                display: flex;
+                gap: 0.5rem;
+            }
+            .container { padding: 0.75rem; }
+            .staff-header { padding: 0.75rem 1rem; }
+        }
     </style>
 </head>
 <body>
@@ -204,8 +259,10 @@ $shortUrl = $protocol . '://' . $host . $dir . '/s.php?t=' . urlencode($token);
 
             <div class="share-url-box">
                 <label>このページのURL:</label>
-                <input type="text" id="shareUrl" value="<?= htmlspecialchars($shortUrl) ?>" readonly onclick="this.select()">
-                <button class="btn-copy" id="btnCopyUrl">コピー</button>
+                <div class="url-row">
+                    <input type="text" id="shareUrl" value="<?= htmlspecialchars($shortUrl) ?>" readonly onclick="this.select()">
+                    <button class="btn-copy" id="btnCopyUrl">コピー</button>
+                </div>
             </div>
 
             <div class="filter-form">
@@ -336,27 +393,46 @@ $shortUrl = $protocol . '://' . $host . $dir . '/s.php?t=' . urlencode($token);
 
                 items.sort((a, b) => b.month - a.month);
 
-                let html = '<table class="clocklog-table">';
-                html += '<thead><tr><th>月</th><th>ファイル名</th><th>生成日時</th><th>操作</th></tr></thead>';
-                html += '<tbody>';
+                // PC用テーブル
+                let table = '<div class="pdf-table-wrap"><table class="clocklog-table">';
+                table += '<thead><tr><th>月</th><th>ファイル名</th><th>生成日時</th><th>操作</th></tr></thead>';
+                table += '<tbody>';
+
+                // スマホ用カード
+                let cards = '<div class="pdf-card-list">';
 
                 for (const item of items) {
                     const createdAt = item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '-';
                     const dlUrl = 'download.php?id=' + encodeURIComponent(item.fileId) + '&token=' + encodeURIComponent(token);
                     const viewUrl = dlUrl + '&view=1';
-                    html += '<tr>';
-                    html += '<td>' + item.month + '月</td>';
-                    html += '<td>' + escapeHtml(item.fileName) + '</td>';
-                    html += '<td>' + escapeHtml(createdAt) + '</td>';
-                    html += '<td>';
-                    html += '<a href="' + viewUrl + '" target="_blank" class="btn-view">表示</a> ';
-                    html += '<a href="' + dlUrl + '" class="btn btn-sm btn-download">ダウンロード</a>';
-                    html += '</td>';
-                    html += '</tr>';
+
+                    // テーブル行
+                    table += '<tr>';
+                    table += '<td>' + item.month + '月</td>';
+                    table += '<td>' + escapeHtml(item.fileName) + '</td>';
+                    table += '<td>' + escapeHtml(createdAt) + '</td>';
+                    table += '<td>';
+                    table += '<a href="' + viewUrl + '" target="_blank" class="btn-view">表示</a> ';
+                    table += '<a href="' + dlUrl + '" class="btn btn-sm btn-download">ダウンロード</a>';
+                    table += '</td>';
+                    table += '</tr>';
+
+                    // カード
+                    cards += '<div class="pdf-card">';
+                    cards += '<div class="pdf-card-header">';
+                    cards += '<span class="pdf-card-month">' + item.month + '月</span>';
+                    cards += '<span class="pdf-card-date">' + escapeHtml(createdAt) + '</span>';
+                    cards += '</div>';
+                    cards += '<div class="pdf-card-actions">';
+                    cards += '<a href="' + viewUrl + '" target="_blank" class="btn-view">表示</a>';
+                    cards += '<a href="' + dlUrl + '" class="btn btn-sm btn-download">ダウンロード</a>';
+                    cards += '</div>';
+                    cards += '</div>';
                 }
 
-                html += '</tbody></table>';
-                pdfListBody.innerHTML = html;
+                table += '</tbody></table></div>';
+                cards += '</div>';
+                pdfListBody.innerHTML = table + cards;
 
             } catch (err) {
                 pdfListBody.innerHTML = '<p class="alert alert-error">通信エラー: ' + escapeHtml(err.message) + '</p>';
