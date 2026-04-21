@@ -309,7 +309,7 @@ $shortUrl = $protocol . '://' . $host . $dir . '/s.php?t=' . urlencode($token);
     <?php endif; ?>
 
     <footer style="text-align:center; padding:1.5rem; color:#8a7f6e; font-size:0.8rem;">
-        勤怠管理システム ver3.0
+        勤怠管理システム ver3.1
     </footer>
 
     <script>

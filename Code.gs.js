@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver3.0
+ *  勤怠管理システム — Google Apps Script  ver3.1
  * ====================================
  *
  *  セットアップ手順:
@@ -1081,6 +1081,59 @@ function recordPaidLeave(staffName, targetDateStr, memo) {
     success: true,
     message: staffName + 'さんの' + dateLabel + 'の有給を申請しました'
   };
+}
+
+// =====================================================================
+//  有給申請済み一覧取得（HTML画面から呼ばれる）
+//  当月給与期間（前月16日〜当月15日）の有給日付リストを返す
+// =====================================================================
+function getPaidLeaveList(staffName) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) return [];
+
+  // 当月の給与期間を算出（16日〜翌15日）
+  const today = new Date();
+  let periodYear, periodMonth;
+  if (today.getDate() <= CUTOFF_DAY) {
+    // 1日〜15日 → 前月16日〜今月15日
+    periodYear = today.getFullYear();
+    periodMonth = today.getMonth() + 1; // 締め月（今月）
+  } else {
+    // 16日〜末日 → 今月16日〜翌月15日
+    periodYear = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear();
+    periodMonth = today.getMonth() === 11 ? 1 : today.getMonth() + 2;
+  }
+  const periodStart = new Date(periodYear, periodMonth - 2, 16);
+  periodStart.setHours(0, 0, 0, 0);
+  const periodEnd = new Date(periodYear, periodMonth - 1, CUTOFF_DAY);
+  periodEnd.setHours(23, 59, 59, 999);
+
+  // 打刻ログから該当スタッフの有給レコードを検索
+  if (logSheet.getLastRow() <= 1) return [];
+  const data = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
+  const DAY_NAMES = ['日','月','火','水','木','金','土'];
+  const results = [];
+
+  for (const row of data) {
+    if (!row[0]) continue;
+    if (row[1] !== staffName || row[2] !== '有給') continue;
+    const d = new Date(row[3]);
+    d.setHours(0, 0, 0, 0);
+    if (d >= periodStart && d <= periodEnd) {
+      results.push({
+        date: (d.getMonth() + 1) + '/' + d.getDate(),
+        dayOfWeek: DAY_NAMES[d.getDay()],
+        sortKey: d.getTime()
+      });
+    }
+  }
+
+  // 日付順にソート
+  results.sort(function(a, b) { return a.sortKey - b.sortKey; });
+
+  // sortKeyを除去して返す
+  return results.map(function(r) { return { date: r.date, dayOfWeek: r.dayOfWeek }; });
 }
 
 // =====================================================================

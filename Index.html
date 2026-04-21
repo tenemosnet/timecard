@@ -287,6 +287,73 @@
     box-shadow: 0 4px 20px rgba(139,92,246,0.3);
   }
 
+  /* 有給申請済み一覧 */
+  .leave-list-section {
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 20px;
+    padding-top: 16px;
+  }
+  .leave-list-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 10px 0;
+    background: none;
+    border: 1px solid rgba(139,92,246,0.3);
+    border-radius: 10px;
+    color: #a78bfa;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .leave-list-toggle:hover { background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.5); }
+  .leave-list-toggle .arrow { transition: transform 0.25s; display: inline-block; font-size: 11px; }
+  .leave-list-toggle.open .arrow { transform: rotate(180deg); }
+  .leave-list-area {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .leave-list-area.open { max-height: 300px; overflow-y: auto; }
+  .leave-list-items {
+    padding: 12px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .leave-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: rgba(139,92,246,0.08);
+    font-size: 14px;
+  }
+  .leave-list-item .leave-date { color: var(--text); font-weight: 600; min-width: 60px; }
+  .leave-list-item .leave-day { color: var(--text-sub); font-size: 13px; }
+  .leave-list-empty {
+    text-align: center;
+    color: var(--text-sub);
+    font-size: 13px;
+    padding: 16px 0 4px;
+  }
+  .leave-list-count {
+    text-align: center;
+    color: var(--text-sub);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .leave-list-loading {
+    text-align: center;
+    color: var(--text-sub);
+    font-size: 13px;
+    padding: 16px 0 4px;
+  }
+
   /* モーダル */
   .modal-overlay {
     display: none;
@@ -485,6 +552,15 @@
       <button class="btn btn-cancel" onclick="closeLeaveModal()">キャンセル</button>
       <button class="btn btn-leave" id="leaveConfirmBtn" onclick="confirmLeave()">申請する</button>
     </div>
+    <div class="leave-list-section">
+      <button class="leave-list-toggle" id="leaveListToggle" onclick="toggleLeaveList()">
+        <span>&#x1F4CB; 申請済みの有給を確認</span>
+        <span class="arrow">&#x25BC;</span>
+      </button>
+      <div class="leave-list-area" id="leaveListArea">
+        <div id="leaveListContent"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -648,12 +724,66 @@
     var d = String(now.getDate()).padStart(2, '0');
     document.getElementById('leaveDate').value = y + '-' + m + '-' + d;
 
+    // 一覧を閉じた状態にリセット
+    document.getElementById('leaveListToggle').classList.remove('open');
+    document.getElementById('leaveListArea').classList.remove('open');
+    document.getElementById('leaveListContent').innerHTML = '';
+
     document.getElementById('leaveModal').classList.add('show');
   }
 
   function closeLeaveModal() {
     document.getElementById('leaveModal').classList.remove('show');
     pendingLeave = null;
+  }
+
+  // ===== 有給申請済み一覧 =====
+  function toggleLeaveList() {
+    var toggle = document.getElementById('leaveListToggle');
+    var area = document.getElementById('leaveListArea');
+    var isOpen = toggle.classList.contains('open');
+
+    if (isOpen) {
+      toggle.classList.remove('open');
+      area.classList.remove('open');
+    } else {
+      toggle.classList.add('open');
+      area.classList.add('open');
+      loadLeaveList();
+    }
+  }
+
+  function loadLeaveList() {
+    if (!pendingLeave) return;
+    var content = document.getElementById('leaveListContent');
+    content.innerHTML = '<div class="leave-list-loading">読み込み中...</div>';
+
+    google.script.run
+      .withSuccessHandler(function(list) {
+        renderLeaveList(list);
+      })
+      .withFailureHandler(function(err) {
+        content.innerHTML = '<div class="leave-list-empty">取得に失敗しました</div>';
+      })
+      .getPaidLeaveList(pendingLeave.name);
+  }
+
+  function renderLeaveList(list) {
+    var content = document.getElementById('leaveListContent');
+    if (!list || list.length === 0) {
+      content.innerHTML = '<div class="leave-list-empty">当月期間の有給申請はありません</div>';
+      return;
+    }
+    var html = '<div class="leave-list-items">';
+    list.forEach(function(item) {
+      html += '<div class="leave-list-item">';
+      html += '<span class="leave-date">' + item.date + '</span>';
+      html += '<span class="leave-day">（' + item.dayOfWeek + '）</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<div class="leave-list-count">当月期間: ' + list.length + '件</div>';
+    content.innerHTML = html;
   }
 
   function confirmLeave() {
@@ -676,6 +806,11 @@
         isProcessing = false;
         showToast(result.message, 'success');
         loadStaff();
+        // 一覧が開いていたら自動更新
+        if (document.getElementById('leaveListToggle').classList.contains('open')) {
+          pendingLeave = { name: name };
+          loadLeaveList();
+        }
       })
       .withFailureHandler(function(err) {
         isProcessing = false;

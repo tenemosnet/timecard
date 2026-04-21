@@ -265,7 +265,7 @@ $currentMonth = (int)date('n');
     <input type="hidden" id="staff-list" value="<?= htmlspecialchars(json_encode($staffList)) ?>">
 
     <footer style="text-align:center; padding:1.5rem; color:#8a7f6e; font-size:0.8rem;">
-        勤怠管理システム ver3.0
+        勤怠管理システム ver3.1
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
