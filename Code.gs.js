@@ -1049,6 +1049,15 @@ function recordPaidLeave(staffName, targetDateStr, memo) {
         throw new Error(staffName + 'さんの' + dateLabel + 'の有給はすでに申請済みです');
       }
     }
+    // 入室チェック: 対象日に入室記録があれば有給申請を拒否
+    for (const row of data) {
+      if (!row[0]) continue;
+      const rowDate = new Date(row[3]);
+      rowDate.setHours(0, 0, 0, 0);
+      if (rowDate.getTime() === targetDate.getTime() && row[1] === staffName && row[2] === '入室') {
+        throw new Error('入室済みの勤務日のため、有給申請できません');
+      }
+    }
   }
 
   // 打刻ログに追記（A列=申請日時, B列=氏名, C列="有給", D列=対象日付）
@@ -1124,6 +1133,7 @@ function getPaidLeaveList(staffName) {
       results.push({
         date: (d.getMonth() + 1) + '/' + d.getDate(),
         dayOfWeek: DAY_NAMES[d.getDay()],
+        dateStr: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'),
         sortKey: d.getTime()
       });
     }
@@ -1133,7 +1143,68 @@ function getPaidLeaveList(staffName) {
   results.sort(function(a, b) { return a.sortKey - b.sortKey; });
 
   // sortKeyを除去して返す
-  return results.map(function(r) { return { date: r.date, dayOfWeek: r.dayOfWeek }; });
+  return results.map(function(r) { return { date: r.date, dayOfWeek: r.dayOfWeek, dateStr: r.dateStr }; });
+}
+
+// =====================================================================
+//  有給申請取消（HTML画面から呼ばれる）
+// =====================================================================
+function deletePaidLeave(staffName, targetDateStr) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) throw new Error('打刻ログシートが見つかりません');
+
+  // 日付文字列をパース（"2026-04-18" 形式）
+  const parts = targetDateStr.split('-');
+  const targetDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  targetDate.setHours(0, 0, 0, 0);
+
+  // 打刻ログから該当レコードを検索
+  if (logSheet.getLastRow() <= 1) throw new Error('指定された有給申請が見つかりません');
+  const data = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
+  let deleteRowIndex = -1;
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+    if (row[1] !== staffName || row[2] !== '有給') continue;
+    const rowDate = new Date(row[3]);
+    rowDate.setHours(0, 0, 0, 0);
+    if (rowDate.getTime() === targetDate.getTime()) {
+      deleteRowIndex = i;
+      break;
+    }
+  }
+
+  if (deleteRowIndex === -1) throw new Error('指定された有給申請が見つかりません');
+
+  // 打刻ログから行削除（data は row 2 から始まるので +2）
+  logSheet.deleteRow(deleteRowIndex + 2);
+
+  // スタッフ別シートの備考列をクリア
+  const staffSheet = ss.getSheetByName(staffName);
+  if (staffSheet) {
+    for (let i = 0; i < 31; i++) {
+      const cellDate = staffSheet.getRange(i + 5, 1).getValue();
+      if (cellDate instanceof Date) {
+        const d = new Date(cellDate);
+        d.setHours(0, 0, 0, 0);
+        if (d.getTime() === targetDate.getTime()) {
+          const note = String(staffSheet.getRange(i + 5, 9).getValue());
+          if (note.indexOf('有給') !== -1) {
+            staffSheet.getRange(i + 5, 9).setValue('');
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  const dateLabel = (targetDate.getMonth() + 1) + '/' + targetDate.getDate();
+  return {
+    success: true,
+    message: staffName + 'さんの' + dateLabel + 'の有給を取消しました'
+  };
 }
 
 // =====================================================================

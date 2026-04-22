@@ -353,6 +353,19 @@
     font-size: 13px;
     padding: 16px 0 4px;
   }
+  .leave-delete-btn {
+    margin-left: auto;
+    padding: 4px 12px;
+    background: none;
+    border: 1px solid rgba(248,113,113,0.3);
+    border-radius: 6px;
+    color: #f87171;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .leave-delete-btn:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.5); }
 
   /* モーダル */
   .modal-overlay {
@@ -779,11 +792,34 @@
       html += '<div class="leave-list-item">';
       html += '<span class="leave-date">' + item.date + '</span>';
       html += '<span class="leave-day">（' + item.dayOfWeek + '）</span>';
+      html += '<button class="leave-delete-btn" onclick="event.stopPropagation(); confirmDeleteLeave(\'' + item.dateStr + '\', \'' + item.date + '\')">取消</button>';
       html += '</div>';
     });
     html += '</div>';
     html += '<div class="leave-list-count">当月期間: ' + list.length + '件</div>';
     content.innerHTML = html;
+  }
+
+  function confirmDeleteLeave(dateStr, displayDate) {
+    if (!pendingLeave || isProcessing) return;
+    if (!confirm(displayDate + ' の有給申請を取消しますか？')) return;
+
+    var name = pendingLeave.name;
+    isProcessing = true;
+    renderStaff();
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        isProcessing = false;
+        showToast(result.message, 'success');
+        loadLeaveList();
+        loadStaff();
+      })
+      .withFailureHandler(function(err) {
+        isProcessing = false;
+        showToast(err.message, 'error');
+      })
+      .deletePaidLeave(name, dateStr);
   }
 
   function confirmLeave() {
