@@ -11,11 +11,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 [タブレット端末]  --google.script.run-->  [Code.gs (GAS)]  --API-->  [Google スプレッドシート]
   (Index.html)                           (Webアプリとして公開)          (打刻ログ + スタッフ別シート)
+
+[Xserver PHP管理画面]  --HTTP POST(doPost)-->  [Code.gs (GAS API)]  --API-->  [Google スプレッドシート]
+  (kintai-admin/)                              (APIキー認証)
 ```
 
-- **Code.gs.js**: サーバーサイドロジック。GASエディタでは `Code.gs` として配置。Web API関数（`recordClock`, `getStaffWithStatus`）はWebApp経由で呼ばれるため `SpreadsheetApp.openById()` を使用（`getActiveSpreadsheet()` はWebApp経由では `null` を返す）。メニュー関数（`initialize`, `promptNewMonth` 等）はスプレッドシートUIから呼ばれるため `getActiveSpreadsheet()` で問題ない。
-- **Index.html**: フロントエンド。GASの `HtmlService.createHtmlOutputFromFile('Index')` で配信。外部ライブラリなし、Vanilla JS + CSS Grid。ダークモードUI。
-- **タイムカード設計仕様書.md**: 全仕様の詳細ドキュメント。数式ロジック、UI仕様、運用フローを含む。
+### 2つの通信経路
+
+- **タブレットUI → GAS**: `google.script.run` で直接呼び出し（同一GASドメイン内）
+- **管理画面PHP → GAS**: `doPost` エンドポイントへHTTP POST（APIキー認証、JSON形式）
+
+### ファイル構成
+
+- **Code.gs.js**: サーバーサイドロジック。GASエディタでは `Code.gs` として配置
+- **Index.html**: タブレット打刻画面。Vanilla JS + CSS、ダークモードUI
+- **kintai-admin/**: Xserver上のPHP管理画面（PDF生成・打刻修正・スタッフ管理）
+- **タイムカード設計仕様書.md**: 全仕様の詳細ドキュメント
 
 ## Key Configuration (Code.gs.js top section)
 
@@ -39,25 +50,70 @@ const CUTOFF_DAY = 15;               // 給与締め日（16日〜翌15日）
 - コード変更後、Webアプリに反映するには「デプロイ→デプロイを管理→新バージョン」で再デプロイが必要
 - メニュー関数の変更は保存＋スプレッドシートリロードのみで反映
 
+## GAS Functions（タブレットUI用 — google.script.run）
+
+| 関数 | 用途 |
+|------|------|
+| `getStaffWithStatus()` | スタッフ一覧＋当日の出退勤ステータス取得 |
+| `recordClock(name, type)` | 入室/退室の打刻記録 |
+| `recordPaidLeave(name, dateStr, memo)` | 有給申請（入室済み日はブロック） |
+| `deletePaidLeave(name, dateStr)` | 有給取消 |
+| `getPaidLeaveList(staffName)` | 当月給与期間の有給申請済み一覧 |
+
+## GAS API Functions（管理画面用 — doPost経由）
+
+`doPost` でJSON受信 → `action` フィールドでディスパッチ。`api*_()` プレフィクスの内部関数群。
+
+主な操作: `getClockLog`, `addClockEntry`, `editClockEntry`, `deleteClockEntry`, `getStaffList`, `setStaffSetting`, `addStaff`, `removeStaff`, `renameStaff`, `generatePDF`, `listPDFs`, `getPDFContent`
+
+## Spreadsheet Structure
+
+- **打刻ログ**: 生データ（A:記録日時, B:氏名, C:種別[入室/退室/有給], D:日付）
+- **備考ログ**: 月移行時の備考バックアップ
+- **スタッフ設定**: スタッフ名と定時（時間）の対応表
+- **スタッフ別シート**: シート名＝スタッフ名。D2=年, F2=月, I2=定時。行5-35に日別データ（16日〜翌15日）、行36に月次合計
+- **列構成（A〜I）**: 日, 曜日, 開始時間, 終了時間, 休憩時間, 定時内時間, 残業時間, 深夜残業時間, 備考
+
+## Admin Page (kintai-admin/)
+
+Xserver上のPHP管理画面。主要ファイル:
+
+| ファイル | 役割 |
+|---------|------|
+| `config.php` | DB接続・GAS API設定（.gitignore対象） |
+| `auth.php` | セッション管理・ログイン試行制限（5回/15分） |
+| `dashboard.php` | メインダッシュボード（PDF生成UI） |
+| `clocklog.php` | 打刻データ検索・修正・追加・削除 |
+| `staff_view.php` | スタッフ個人閲覧ページ（トークン認証で直接アクセス可） |
+| `api.php` | GAS APIへのcurlラッパー |
+| `assets/` | CSS・JS（app.js, clocklog.js） |
+
+- **DB**: tenemosnet_kintai（MySQL, ユーザー: tenemosnet_time）
+- **GAS API通信**: `api.php` → doPostエンドポイント（APIキー認証）
+
+## Version Management
+
+バージョン表記は以下の4ファイルに存在し、すべて同時に更新する:
+
+- `Code.gs.js` 3行目コメント
+- `kintai-admin/dashboard.php` footer
+- `kintai-admin/clocklog.php` footer
+- `kintai-admin/staff_view.php` footer
+
 ## Deployment
 
+### GAS（タブレットUI）
+1. GASエディタで Code.gs / Index.html を更新
+2. 「デプロイ → デプロイを管理 → 新バージョン」で再デプロイ
+
+### PHP（管理画面 → Xserver）
+```bash
+scp -i ~/.ssh/xserver_rsa -P 10022 <files> tenemosnet@sv8542.xserver.jp:~/tenemosnet.xsrv.jp/public_html/kintai-admin/
+```
+
+### 初期セットアップ
 1. スプレッドシート作成 → URLからIDをコピー
 2. Apps Scriptエディタで Code.gs / Index.html を配置
 3. `SPREADSHEET_ID` を設定
 4. メニュー「勤怠管理 → 初期設定」実行
 5. 「デプロイ → 新しいデプロイ → ウェブアプリ」で公開
-
-## Spreadsheet Structure
-
-- **打刻ログ**: 生データ（記録日時, 氏名, 種別, 日付）。アプリが自動追記。
-- **備考ログ**: 月移行時の備考バックアップ。
-- **スタッフ設定**: スタッフ名と定時（時間）の対応表。管理者ページから変更可能。
-- **スタッフ別シート**: シート名＝スタッフ名。D2=年, F2=月で表示月を切り替え。I2=定時（スタッフ設定シートを参照）。行5-35に日別データ（16日〜翌15日、FILTER数式で打刻ログから自動取得）、行36に月次合計。
-- **列構成（A〜I）**: 日, 曜日, 開始時間, 終了時間, 休憩時間, 定時内時間, 残業時間, 深夜残業時間, 備考
-
-## Admin Page (kintai-admin/)
-
-エックスサーバー上のPHP管理者ページ。PDF生成・ダウンロード・スタッフ設定を管理。
-- **config.php**: DB接続・GAS API設定（.gitignore対象）
-- **GAS API**: doPostエンドポイント経由で通信（APIキー認証）
-- **DB**: tenemosnet_kintai（MySQLユーザー: tenemosnet_time）

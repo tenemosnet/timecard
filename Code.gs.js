@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver3.1
+ *  勤怠管理システム — Google Apps Script  ver3.2
  * ====================================
  *
  *  セットアップ手順:
@@ -996,6 +996,7 @@ function recordClock(staffName, type) {
   if (!logSheet) throw new Error('打刻ログシートが見つかりません。初期設定を実行してください。');
 
   const now = new Date();
+  now.setSeconds(0, 0);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   // 重複チェック: 同じ日・同じ人・同じ種別があればエラー
