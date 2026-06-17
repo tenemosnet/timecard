@@ -229,7 +229,7 @@ $currentMonth = (int)date('n');
         <!-- 打刻修正への誘導 -->
         <section class="card">
             <h2>打刻データの修正</h2>
-            <p>打刻の追加・修正・削除は、<a href="clocklog.php"><strong>打刻データ修正ページ</strong></a>から行えます。</p>
+            <p>打刻の追加・修正・削除は<a href="clocklog.php"><strong>→こちらから</strong></a></p>
             <p class="text-muted" style="font-size:0.85rem;">スプレッドシートのセルを直接編集すると数式が壊れる場合があります。修正は必ず管理画面から行ってください。</p>
         </section>
 
@@ -265,7 +265,7 @@ $currentMonth = (int)date('n');
     <input type="hidden" id="staff-list" value="<?= htmlspecialchars(json_encode($staffList)) ?>">
 
     <footer style="text-align:center; padding:1.5rem; color:#8a7f6e; font-size:0.8rem;">
-        勤怠管理システム ver3.2
+        勤怠管理システム ver3.3
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>

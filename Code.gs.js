@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver3.2
+ *  勤怠管理システム — Google Apps Script  ver3.3
  * ====================================
  *
  *  セットアップ手順:
@@ -616,15 +616,43 @@ function createStaffSheet_(ss, staffName, year, month) {
 
 // =====================================================================
 //  備考欄に祝日名を自動記入（空セルのみ）
+//  J列の数式再計算タイミングに依存しないよう、祝日シートを直接参照する
 // =====================================================================
 function fillHolidayNames_(sheet) {
-  SpreadsheetApp.flush(); // J列の数式を確定
-  const jValues = sheet.getRange('J5:J35').getValues();  // 祝日名
-  const iValues = sheet.getRange('I5:I35').getValues();  // 現在の備考
+  SpreadsheetApp.flush(); // pending な書き込み（B2/D2更新・I列クリア等）を確定
+
+  // B2/D2 を直接読んで対象月の日付を計算
+  const year  = sheet.getRange('B2').getValue();
+  const month = sheet.getRange('D2').getValue();
+  if (!year || !month) return;
+
+  // 祝日シートから祝日マップを構築（date.getTime() → 祝日名）
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const holSheet = ss.getSheetByName(HOLIDAYS_SHEET_NAME);
+  const holMap = {};
+  if (holSheet && holSheet.getLastRow() > 1) {
+    const holData = holSheet.getRange(2, 1, holSheet.getLastRow() - 1, 2).getValues();
+    holData.forEach(function(row) {
+      if (row[0]) {
+        const d = new Date(row[0]);
+        d.setHours(0, 0, 0, 0);
+        holMap[d.getTime()] = row[1];
+      }
+    });
+  }
+
+  const iValues = sheet.getRange('I5:I35').getValues();
+  const endDate = new Date(year, month - 1, CUTOFF_DAY); // DATE(year, month, CUTOFF_DAY)
+  endDate.setHours(0, 0, 0, 0);
 
   let updated = false;
   for (let i = 0; i < 31; i++) {
-    const holidayName = jValues[i][0];
+    // 行 5+i に対応する日付: DATE(year, month-1, 16+i)
+    const d = new Date(year, month - 2, 16 + i);
+    d.setHours(0, 0, 0, 0);
+    if (d > endDate) break; // 締め日超はスキップ
+
+    const holidayName = holMap[d.getTime()];
     const currentNote = iValues[i][0];
     if (holidayName && (!currentNote || currentNote === '')) {
       iValues[i][0] = holidayName;
@@ -1440,9 +1468,32 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   const origMonth = sheet.getRange('D2').getValue();
   const needRestore = (origYear != year || origMonth != month);
 
+  // 備考欄（I列）は手動データのため、B2/D2変更だけでは切り替わらない
+  // 別月PDF生成時は備考を対象月のデータに差し替える
+  let origNotes = null;
   if (needRestore) {
+    origNotes = sheet.getRange('I5:I35').getValues();
     sheet.getRange('B2').setValue(year);
     sheet.getRange('D2').setValue(month);
+    sheet.getRange('I5:I35').clearContent();
+
+    // 備考ログから対象月の備考を復元
+    const notesLog = ss.getSheetByName(NOTES_LOG_SHEET_NAME);
+    if (notesLog && notesLog.getLastRow() > 1) {
+      const logData = notesLog.getRange(2, 1, notesLog.getLastRow() - 1, 5).getValues();
+      logData.forEach(function(row) {
+        if (row[0] == year && row[1] == month && row[2] === staffName) {
+          const day = row[3];
+          if (day >= 1 && day <= 31) {
+            sheet.getRange(day + 4, 9).setValue(row[4]);
+          }
+        }
+      });
+    }
+
+    // 対象月の祝日名を備考欄に記入
+    fillHolidayNames_(sheet);
+
     SpreadsheetApp.flush();
   }
 
@@ -1486,6 +1537,7 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
   if (needRestore) {
     sheet.getRange('B2').setValue(origYear);
     sheet.getRange('D2').setValue(origMonth);
+    sheet.getRange('I5:I35').setValues(origNotes);
     SpreadsheetApp.flush();
   }
 
