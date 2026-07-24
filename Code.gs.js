@@ -1,6 +1,6 @@
 /**
  * ====================================
- *  勤怠管理システム — Google Apps Script  ver3.3
+ *  勤怠管理システム — Google Apps Script  ver3.4
  * ====================================
  *
  *  セットアップ手順:
@@ -659,6 +659,62 @@ function fillHolidayNames_(sheet) {
       updated = true;
     }
   }
+  if (updated) {
+    sheet.getRange('I5:I35').setValues(iValues);
+  }
+}
+
+// =====================================================================
+//  備考欄に有給を自動記入（打刻ログから該当期間の有給エントリを反映）
+//  月遷移時・別月PDF生成時に呼び出し、備考ログに含まれない有給を補完する
+// =====================================================================
+function fillPaidLeaveNotes_(sheet) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet || logSheet.getLastRow() <= 1) return;
+
+  const staffName = sheet.getName();
+  const year = sheet.getRange('B2').getValue();
+  const month = sheet.getRange('D2').getValue();
+  if (!year || !month) return;
+
+  // 期間: 前月16日〜当月15日
+  const startDate = new Date(year, month - 2, 16);
+  startDate.setHours(0, 0, 0, 0);
+  const endDate = new Date(year, month - 1, CUTOFF_DAY);
+  endDate.setHours(0, 0, 0, 0);
+
+  // 打刻ログから該当スタッフ・該当期間の有給エントリを収集
+  const data = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 4).getValues();
+  const paidLeaveSet = {};
+  for (const row of data) {
+    if (!row[0] || row[1] !== staffName || row[2] !== '有給') continue;
+    const d = new Date(row[3]);
+    d.setHours(0, 0, 0, 0);
+    if (d >= startDate && d <= endDate) {
+      paidLeaveSet[d.getTime()] = true;
+    }
+  }
+  if (Object.keys(paidLeaveSet).length === 0) return;
+
+  // I列の現在値を取得し、有給未記入の行に「有給」を記入
+  const iValues = sheet.getRange('I5:I35').getValues();
+  let updated = false;
+
+  for (let i = 0; i < 31; i++) {
+    const cellDate = new Date(year, month - 2, 16 + i);
+    cellDate.setHours(0, 0, 0, 0);
+    if (cellDate > endDate) break;
+
+    if (!paidLeaveSet[cellDate.getTime()]) continue;
+
+    const currentNote = String(iValues[i][0] || '');
+    if (currentNote.indexOf('有給') !== -1) continue; // 既に有給記載済み
+
+    iValues[i][0] = '有給';
+    updated = true;
+  }
+
   if (updated) {
     sheet.getRange('I5:I35').setValues(iValues);
   }
@@ -1362,6 +1418,9 @@ function promptNewMonth() {
 
     // 備考欄に祝日名を記入
     fillHolidayNames_(sheet);
+
+    // 備考欄に有給を記入（打刻ログから該当期間の有給を反映）
+    fillPaidLeaveNotes_(sheet);
   });
 
   ui.alert('完了', '全スタッフのシートを ' + year + '年' + month + '月に更新しました。\n' +
@@ -1496,6 +1555,11 @@ function generateSinglePDF_(ss, sheet, year, month, folder) {
 
     SpreadsheetApp.flush();
   }
+
+  // 有給を備考欄に記入（打刻ログから該当期間の有給を補完）
+  // needRestore の有無にかかわらず常に実行し、備考に有給が欠落していないことを保証する
+  fillPaidLeaveNotes_(sheet);
+  SpreadsheetApp.flush();
 
   // PDF出力前に罫線を確実に適用
   applyBorders_(sheet);
